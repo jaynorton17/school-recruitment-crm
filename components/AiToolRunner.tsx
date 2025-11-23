@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 import { CrmData } from '../types';
 import { SpinnerIcon } from './icons';
 
@@ -21,9 +21,6 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
         setResult('');
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-            const model = 'gemini-2.5-flash';
-            
             const dataSummary = {
                 schools: crmData.schools.slice(0, 20).map(s => ({ name: s.name, location: s.location, manager: s.accountManager, engagement: s.engagementScore })),
                 tasks: crmData.tasks.slice(0, 50).map(t => ({ school: t.schoolName, desc: t.taskDescription, due: t.dueDate, completed: t.isCompleted })),
@@ -39,12 +36,12 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{CONTEXT}}', context);
 
-            const response = await ai.models.generateContent({
-                model: model,
-                contents: fullPrompt
+            const model = getGeminiModel('gemini-2.5-flash');
+            const response = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}]
             });
 
-            setResult(response.text);
+            setResult(response.response.text());
 
         } catch (e) {
             console.error(`Failed to generate AI result for ${tool.name}:`, e);

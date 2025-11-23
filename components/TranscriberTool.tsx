@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 import { CrmData, CallLog } from '../types';
 import { AiIcon, SpinnerIcon, CheckIcon, ExclamationIcon, NotesIcon } from './icons';
 
@@ -74,13 +74,12 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
 
         setStatus({ type: 'info', message: `Found ${callsToProcess.length} calls. Generating AI notes...` });
         
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-        
         const updatePromises = callsToProcess.map(async (call) => {
             try {
                 const prompt = `Based on the following call transcript, generate a concise summary of 1-3 sentences to be used as call notes. Transcript: "${call.transcript}"`;
-                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
-                const aiNotes = response.text;
+                const model = getGeminiModel('gemini-2.5-flash');
+                const response = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }]}] });
+                const aiNotes = response.response.text();
 
                 if (aiNotes) {
                     const updatedLog = { ...call, notes: `(AI-Generated) ${aiNotes.trim()}` };
