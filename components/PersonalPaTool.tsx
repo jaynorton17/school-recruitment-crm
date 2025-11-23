@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 import { CrmData, SuggestedCallList, CustomDialerList } from '../types';
 import { SpinnerIcon, PersonalPaIcon, EditIcon } from './icons';
 
@@ -51,8 +51,6 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
         setHasGenerated(true);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-            
             const dataSummary = {
                 tasks: crmData.tasks.slice(0, 50).map(t => ({ school: t.schoolName, desc: t.taskDescription, due: t.dueDate, completed: t.isCompleted })),
                 notes: crmData.notes.slice(0, 50).map(n => ({ school: n.schoolName, note: n.note.substring(0, 100), date: n.date })),
@@ -63,12 +61,12 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
 
             const fullPrompt = personalPaPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
-            const response = await ai.models.generateContent({ 
-                model: 'gemini-2.5-flash', 
-                contents: fullPrompt,
-                config: { responseMimeType: "application/json" }
+            const model = getGeminiModel('gemini-2.5-flash');
+            const response = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}],
+                responseMimeType: "application/json"
             });
-            const result = JSON.parse(response.text.trim());
+            const result = JSON.parse(response.response.text().trim());
 
             if (result.briefing) {
                 setBriefingText(result.briefing);

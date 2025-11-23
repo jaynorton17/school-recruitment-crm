@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 import { CrmData, School } from '../types';
 import { SpinnerIcon, ClipboardIcon } from './icons';
 
@@ -51,7 +51,6 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
             setError(null);
             debounceTimeout.current = window.setTimeout(async () => {
                 try {
-                    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
                     const school = crmData.schools.find(s => s.name === selectedSchoolName);
                     
                     const dataSummary = {
@@ -65,13 +64,13 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
                         .replace('{{CONTEXT}}', context)
                         .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
                     
-                    const response = await ai.models.generateContent({
-                        model: 'gemini-2.5-flash',
-                        contents: populatedPrompt,
-                        config: { responseMimeType: 'application/json' },
+                    const model = getGeminiModel('gemini-2.5-flash');
+                    const response = await model.generateContent({
+                        contents: [{ role: 'user', parts: [{ text: populatedPrompt }]}],
+                        responseMimeType: 'application/json',
                     });
 
-                    const result = JSON.parse(response.text.trim());
+                    const result = JSON.parse(response.response.text().trim());
                     setGeneratedContent(result);
                 } catch (e) {
                     console.error("Failed to generate email content:", e);
