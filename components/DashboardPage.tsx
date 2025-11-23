@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { School, Task, CallLog, Email, Note, CoachReportData, CoachChatMessage } from '../types';
 import { SchoolIcon, TaskIcon, CallIcon, EmailIcon, NotesIcon } from './icons';
-import { isOverdue, isDueInNext7Days, isToday, isThisWeek, parseUKDate, isInLast7Days, parseDurationToSeconds, parseUKDateTimeString, autoformatDateInput } from '../utils';
+import { isOverdue, isDueInNext7Days, isToday, isThisWeek, parseUKDate, isInLast7Days, parseDurationToSeconds, parseUKDateTimeString, autoformatDateInput, safeArray } from '../utils';
 import CoachDashboardWidget from './CoachDashboardWidget';
 import PersonalPaDashboardWidget from './PersonalPaDashboardWidget';
 
@@ -95,36 +95,43 @@ const DashboardPage: React.FC<DashboardPageProps> = ({ userName, schools, tasks,
         setEditingTask(null);
     };
 
-    const overdueTasksCount = tasks.filter(t => !t.isCompleted && isOverdue(t.dueDate)).length;
-    
-    // Use the new robust, centralized date-checking functions.
-    const callsLast7Days = callLogs.filter(c => isInLast7Days(c.dateCalled)).length;
-    const emailsLast7Days = emails.filter(e => e.direction === 'sent' && isInLast7Days(e.date)).length;
-    const callsToday = callLogs.filter(c => isToday(c.dateCalled)).length;
-    const callsThisWeek = callLogs.filter(c => isThisWeek(c.dateCalled)).length;
-    
-    const averageCallDuration = useMemo(() => {
-        if (!callLogs || callLogs.length === 0) return "N/A";
-        
-        const validLogs = callLogs.filter(log => log.duration && typeof log.duration === 'string');
-        if (validLogs.length === 0) return "0s";
+    const { overdueTasksCount, callsLast7Days, emailsLast7Days, callsToday, callsThisWeek, averageCallDuration } = useMemo(() => {
+        const safeTasks = safeArray(tasks);
+        const safeCallLogs = safeArray(callLogs).filter(log => !!log.dateCalled);
+        const safeEmails = safeArray(emails).filter(email => !!email.date);
 
-        const totalSeconds = validLogs.reduce((acc, log) => {
-            return acc + parseDurationToSeconds(log.duration);
-        }, 0);
+        const computedOverdueTasks = safeTasks.filter(t => !t.isCompleted && isOverdue(t.dueDate)).length;
 
-        if (totalSeconds === 0) return "0s";
+        const computedCallsLast7Days = safeCallLogs.filter(c => isInLast7Days(c.dateCalled)).length;
+        const computedEmailsLast7Days = safeEmails.filter(e => e.direction === 'sent' && isInLast7Days(e.date)).length;
+        const computedCallsToday = safeCallLogs.filter(c => isToday(c.dateCalled)).length;
+        const computedCallsThisWeek = safeCallLogs.filter(c => isThisWeek(c.dateCalled)).length;
 
-        const avgSeconds = Math.round(totalSeconds / validLogs.length);
+        const validDurationLogs = safeCallLogs.filter(log => log.duration && typeof log.duration === 'string');
+        const averageDurationLabel = (() => {
+            if (validDurationLogs.length === 0) return 'N/A';
 
-        const minutes = Math.floor(avgSeconds / 60);
-        const seconds = avgSeconds % 60;
-        
-        if (minutes === 0 && seconds === 0) return '0s';
-        if (minutes === 0) return `${seconds}s`;
-        
-        return `${minutes}m ${seconds}s`;
-    }, [callLogs]);
+            const totalSeconds = validDurationLogs.reduce((acc, log) => acc + parseDurationToSeconds(log.duration), 0);
+            if (totalSeconds === 0) return '0s';
+
+            const avgSeconds = Math.round(totalSeconds / validDurationLogs.length);
+            const minutes = Math.floor(avgSeconds / 60);
+            const seconds = avgSeconds % 60;
+
+            if (minutes === 0 && seconds === 0) return '0s';
+            if (minutes === 0) return `${seconds}s`;
+            return `${minutes}m ${seconds}s`;
+        })();
+
+        return {
+            overdueTasksCount: computedOverdueTasks,
+            callsLast7Days: computedCallsLast7Days,
+            emailsLast7Days: computedEmailsLast7Days,
+            callsToday: computedCallsToday,
+            callsThisWeek: computedCallsThisWeek,
+            averageCallDuration: averageDurationLabel,
+        };
+    }, [tasks, callLogs, emails]);
 
     const allRecentActivities = useMemo(() => {
         const sortByDate = (a: { date: string }, b: { date: string }) => {

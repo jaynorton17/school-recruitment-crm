@@ -108,6 +108,9 @@ const JobAlertsTool: React.FC<JobAlertsToolProps> = ({ crmData, onBack, onAddNew
         const school = crmData.schools.find(s => s.name === schoolName);
         if (school) {
             onSelectSchool(school);
+        } else {
+            console.warn('Could not match job alert to school', schoolName);
+            alert('This job alert could not be linked to a school profile. Please check the school name.');
         }
     };
 

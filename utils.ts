@@ -120,6 +120,10 @@ export const parseUKDateTimeString = (dateTimeStr: string | undefined | null): D
     return parseUKDate(s);
 };
 
+export const safeArray = <T>(value: T[] | null | undefined): T[] => {
+    return Array.isArray(value) ? value : [];
+};
+
 /**
  * Formats an Excel serial date number into a UK date and time string (DD/MM/YYYY HH:mm).
  * Handles both date-only and date-time serials.
