@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { School, CallLog } from '../types';
 import { SpinnerIcon, AddIcon, TrashIcon, MicIcon, StopIcon, ExportIcon } from './icons';
 import { formatDateTimeUK, fileToBase64, autoformatDateInput } from '../utils';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 
 interface AddCallLogModalProps {
     isOpen: boolean;
@@ -106,7 +106,7 @@ const AddCallLogModal: React.FC<AddCallLogModalProps> = ({ isOpen, onClose, onSu
 
         try {
             if (file.type.startsWith('audio/')) {
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+                const model = getGeminiModel('gemini-2.5-flash');
                 const audioBytes = await fileToBase64(file);
                 const audioPart = {
                     inlineData: {
@@ -114,18 +114,18 @@ const AddCallLogModal: React.FC<AddCallLogModalProps> = ({ isOpen, onClose, onSu
                         mimeType: file.type,
                     },
                 };
-                
-                const result = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: { 
+
+                const result = await model.generateContent({
+                    contents: [{
+                        role: 'user',
                         parts: [
                             audioPart,
                             { text: "Transcribe this audio of a phone call for a school recruitment CRM." }
                         ]
-                    }
+                    }]
                 });
 
-                const transcript = result.text;
+                const transcript = result.response.text();
                 if (transcript) {
                     setEditableTranscript(transcript);
                 } else {
