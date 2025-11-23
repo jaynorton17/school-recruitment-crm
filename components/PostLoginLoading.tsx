@@ -48,11 +48,11 @@ const Snowman = () => (
         <stop offset="100%" stopColor="#cbd5e1" />
       </radialGradient>
     </defs>
-    <g className="snowman-body" stroke="#0f172a" strokeWidth="2" fill="url(#snow-shadow)">
+    <g stroke="#0f172a" strokeWidth="2" fill="url(#snow-shadow)">
       <circle cx="60" cy="110" r="35" />
       <circle cx="60" cy="60" r="28" />
     </g>
-    <g className="snowman-arms" strokeLinecap="round" stroke="#0f172a" strokeWidth="4" fill="none">
+    <g strokeLinecap="round" stroke="#0f172a" strokeWidth="4" fill="none">
       <path d="M35 95 Q 20 90 10 80" />
       <path d="M85 95 Q 100 90 110 80" />
     </g>
@@ -62,7 +62,7 @@ const Snowman = () => (
     </g>
     <polygon points="60,60 90,65 60,70" fill="#fb923c" stroke="#ea580c" strokeWidth="2" />
     <path d="M48 78 Q 60 85 72 78" stroke="#0f172a" strokeWidth="3" fill="none" strokeLinecap="round" />
-    <g className="snowman-hat">
+    <g>
       <rect x="40" y="32" width="40" height="10" fill="#0f172a" />
       <rect x="46" y="20" width="28" height="12" fill="#0f172a" />
     </g>
@@ -71,105 +71,6 @@ const Snowman = () => (
       <circle cx="60" cy="120" r="3" fill="#475569" />
       <circle cx="60" cy="135" r="3" fill="#475569" />
     </g>
-  </svg>
-);
-
-const GiftPile = () => (
-  <svg viewBox="0 0 120 90" xmlns="http://www.w3.org/2000/svg">
-    <g>
-      <rect x="8" y="44" width="42" height="30" rx="3" fill="#38bdf8" stroke="#0ea5e9" strokeWidth="2" />
-      <rect x="26" y="44" width="6" height="30" fill="#e2e8f0" />
-      <rect x="8" y="60" width="42" height="6" fill="#e2e8f0" />
-
-      <rect x="52" y="34" width="36" height="40" rx="4" fill="#facc15" stroke="#ca8a04" strokeWidth="2" />
-      <rect x="68" y="34" width="4" height="40" fill="#7c2d12" />
-      <rect x="52" y="52" width="36" height="6" fill="#7c2d12" />
-
-      <rect x="14" y="18" width="28" height="32" rx="3" fill="#f472b6" stroke="#be185d" strokeWidth="2" />
-      <rect x="26" y="18" width="4" height="32" fill="#f8fafc" />
-      <rect x="14" y="32" width="28" height="6" fill="#f8fafc" />
-
-      <rect x="76" y="10" width="28" height="26" rx="3" fill="#c084fc" stroke="#6b21a8" strokeWidth="2" />
-      <rect x="88" y="10" width="3" height="26" fill="#ede9fe" />
-      <rect x="76" y="22" width="28" height="5" fill="#ede9fe" />
-    </g>
-  </svg>
-);
-
-const ChristmasTree = () => (
-  <svg viewBox="0 0 180 220" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <linearGradient id="tree-green" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#16a34a" />
-        <stop offset="100%" stopColor="#065f46" />
-      </linearGradient>
-      <linearGradient id="tree-trunk" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stopColor="#92400e" />
-        <stop offset="100%" stopColor="#78350f" />
-      </linearGradient>
-    </defs>
-
-    {/* Star */}
-    <g fill="#fbbf24" stroke="#d97706" strokeWidth="2" transform="translate(90 15) rotate(12)">
-      <polygon points="0,-18 5,-4 20,-4 8,4 12,18 0,9 -12,18 -8,4 -20,-4 -5,-4" />
-    </g>
-
-    {/* Tree layers */}
-    <g fill="url(#tree-green)" stroke="#064e3b" strokeWidth="2">
-      <polygon points="90,30 150,110 30,110" />
-      <polygon points="90,70 165,150 15,150" />
-      <polygon points="90,115 175,195 5,195" />
-    </g>
-
-    {/* Baubles */}
-    <g fill="#e11d48" stroke="#9f1239" strokeWidth="1.5">
-      <circle cx="80" cy="80" r="5" />
-      <circle cx="110" cy="95" r="5" />
-      <circle cx="70" cy="135" r="5" />
-      <circle cx="120" cy="150" r="5" />
-    </g>
-    <g fill="#38bdf8" stroke="#0ea5e9" strokeWidth="1.5">
-      <circle cx="95" cy="60" r="4" />
-      <circle cx="60" cy="115" r="4" />
-      <circle cx="140" cy="140" r="4" />
-      <circle cx="100" cy="175" r="4" />
-    </g>
-
-    {/* Garland */}
-    <path
-      d="M35 120 C 70 140, 110 120, 150 140"
-      stroke="#f59e0b"
-      strokeWidth="4"
-      fill="none"
-      strokeDasharray="10 6"
-      strokeLinecap="round"
-    />
-    <path
-      d="M25 160 C 65 185, 115 170, 160 190"
-      stroke="#c084fc"
-      strokeWidth="4"
-      fill="none"
-      strokeDasharray="10 6"
-      strokeLinecap="round"
-    />
-
-    {/* Presents */}
-    <g>
-      <rect x="40" y="185" width="40" height="25" fill="#f472b6" stroke="#be185d" strokeWidth="2" rx="2" />
-      <rect x="60" y="185" width="6" height="25" fill="#f8fafc" />
-      <rect x="40" y="196" width="40" height="6" fill="#f8fafc" />
-
-      <rect x="90" y="190" width="32" height="20" fill="#38bdf8" stroke="#0ea5e9" strokeWidth="2" rx="2" />
-      <rect x="103" y="190" width="5" height="20" fill="#f8fafc" />
-      <rect x="90" y="200" width="32" height="5" fill="#f8fafc" />
-
-      <rect x="130" y="188" width="28" height="22" fill="#fde047" stroke="#ca8a04" strokeWidth="2" rx="2" />
-      <rect x="142" y="188" width="4" height="22" fill="#7c2d12" />
-      <rect x="130" y="198" width="28" height="4" fill="#7c2d12" />
-    </g>
-
-    {/* Trunk */}
-    <rect x="80" y="195" width="20" height="25" fill="url(#tree-trunk)" stroke="#451a03" strokeWidth="2" />
   </svg>
 );
 
@@ -411,6 +312,18 @@ const PostLoginLoading: React.FC<{ progress: number }> = ({ progress }) => {
             0%, 100% { transform: rotate(-3deg); }
             50% { transform: rotate(3deg); }
         }
+        .snowman-container {
+            position: absolute;
+            bottom: 6%;
+            right: 8%;
+            width: 120px;
+            filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.45));
+            animation: gentle-bob 4s ease-in-out infinite;
+        }
+        @keyframes gentle-bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
         .progress-bar {
             width: 100%;
             height: 10px;
@@ -546,25 +459,8 @@ const PostLoginLoading: React.FC<{ progress: number }> = ({ progress }) => {
         <p className="mt-3 text-xl font-mono tracking-wider">{Math.floor(progress)}%</p>
       </div>
 
-      <div className="snowman-snowbank" aria-hidden></div>
-      <div className="tree-snowbank" aria-hidden></div>
       <div className="snowman-container" aria-hidden>
         <Snowman />
-      </div>
-      <div className="tree-container" aria-hidden>
-        <ChristmasTree />
-      </div>
-      <div className="gift-pile" aria-hidden>
-        <GiftPile />
-      </div>
-      <div className="candy-canes" aria-hidden>
-        <div className="candy-cane" />
-        <div className="candy-cane" />
-      </div>
-      <div className="ground-lanterns" aria-hidden>
-        <div className="lantern" />
-        <div className="lantern" />
-        <div className="lantern" />
       </div>
     </div>
   );
