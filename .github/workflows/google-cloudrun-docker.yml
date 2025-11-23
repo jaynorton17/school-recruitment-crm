@@ -28,7 +28,7 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-      - name: Set up Google Cloud CLI
+      - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Configure Docker authentication
@@ -49,5 +49,5 @@ jobs:
           image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}'
           flags: '--allow-unauthenticated'
 
-      - name: Show Deployed URL
-        run: echo "Deployed URL: ${{ steps.deploy.outputs.url }}"
+      - name: Show URL
+        run: echo ${{ steps.deploy.outputs.url }}
