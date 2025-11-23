@@ -1,0 +1,7 @@
+{
+  "name": "School Recruitment CRM",
+  "description": "A comprehensive CRM to manage relationships with schools, track tasks, notes, emails, and call logs for recruitment purposes.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
