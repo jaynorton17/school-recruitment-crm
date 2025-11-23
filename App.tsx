@@ -4,7 +4,7 @@ import { PublicClientApplication, AccountInfo } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from './authConfig';
 import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, addNote, addTask, addEmail, getWorksheetMap, updateTask, deleteTask, getUserEmails, updateSchool, getUserProfile, updateSpokenToCoverManagerStatus, updateNote, deleteNote, sendEmail, addOpportunity, updateOpportunity, deleteOpportunity, deleteCallLog, updateCallLog, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate, clearAllEmailTemplates, addEmailTemplateAttachment, deleteEmailTemplateAttachment, updateOpportunityNotes, updateCallLogTranscript, addAnnouncement, clearAllEmailTemplateAttachments, addBooking, deleteBooking, updateBooking, updateCandidate, addCandidate, addJobAlert, deleteJobAlert } from './graph';
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
-import { generateGeminiJson, generateGeminiText } from './services/gemini';
+import { generateGeminiJson, generateGeminiText, getGeminiModel } from './services/gemini';
 
 
 import Sidebar from './components/Sidebar';
@@ -1049,16 +1049,50 @@ const App: React.FC = () => {
         `;
 
         try {
-            const { data: parsedResult, error, rawText } = await generateGeminiJson<any>(prompt, {});
+            const model = await getGeminiModel("gemini-1.5-flash");
+            const result = await model.generateContent({
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                responseMimeType: "application/json"
+            });
 
-            setAiGeneratedNotes(parsedResult.notes || '');
-            setSuggestedTasks(parsedResult.tasks?.map((t: any, i: number) => ({ id: `ai_task_${Date.now()}_${i}`, ...t })) || []);
-            setAiGeneratedEmail(parsedResult.email || null);
-            setIsTaskSuggestionModalOpen(true);
+            const raw = result.response.text().trim();
+            console.log("AI RAW:", raw);
 
-            if (error) {
-                console.debug('Transcript suggestion raw AI response:', rawText);
+            if (!raw) {
+                throw new Error("Gemini returned an empty response.");
             }
+
+            let parsed: any;
+            try {
+                parsed = JSON.parse(raw);
+            } catch (parseError) {
+                throw new Error(`Failed to parse Gemini JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+            }
+
+            if (!parsed || typeof parsed !== 'object') {
+                throw new Error("Gemini response was not a valid JSON object.");
+            }
+
+            const notes = typeof parsed.notes === 'string' ? parsed.notes : '';
+            const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : null;
+            const email = parsed.email ?? null;
+
+            if (!notes.trim()) {
+                throw new Error("Gemini response is missing required notes content.");
+            }
+
+            if (!tasks) {
+                throw new Error("Gemini response is missing a tasks array.");
+            }
+
+            if (!email || typeof email !== 'object') {
+                throw new Error("Gemini response is missing the email object.");
+            }
+
+            setAiGeneratedNotes(notes);
+            setSuggestedTasks(tasks.map((t: any, i: number) => ({ id: `ai_task_${Date.now()}_${i}`, ...t })));
+            setAiGeneratedEmail(email);
+            setIsTaskSuggestionModalOpen(true);
 
         } catch (e) {
             console.error("AI notes generation failed:", e);
