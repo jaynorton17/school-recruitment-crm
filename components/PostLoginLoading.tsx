@@ -40,6 +40,40 @@ const SantaSleigh = () => (
 );
 
 
+const Snowman = () => (
+  <svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="snow-shadow" cx="50%" cy="40%" r="60%">
+        <stop offset="0%" stopColor="#f8fafc" />
+        <stop offset="100%" stopColor="#cbd5e1" />
+      </radialGradient>
+    </defs>
+    <g stroke="#0f172a" strokeWidth="2" fill="url(#snow-shadow)">
+      <circle cx="60" cy="110" r="35" />
+      <circle cx="60" cy="60" r="28" />
+    </g>
+    <g strokeLinecap="round" stroke="#0f172a" strokeWidth="4" fill="none">
+      <path d="M35 95 Q 20 90 10 80" />
+      <path d="M85 95 Q 100 90 110 80" />
+    </g>
+    <g fill="#0f172a">
+      <circle cx="50" cy="55" r="3" />
+      <circle cx="70" cy="55" r="3" />
+    </g>
+    <polygon points="60,60 90,65 60,70" fill="#fb923c" stroke="#ea580c" strokeWidth="2" />
+    <path d="M48 78 Q 60 85 72 78" stroke="#0f172a" strokeWidth="3" fill="none" strokeLinecap="round" />
+    <g>
+      <rect x="40" y="32" width="40" height="10" fill="#0f172a" />
+      <rect x="46" y="20" width="28" height="12" fill="#0f172a" />
+    </g>
+    <g stroke="#0f172a" strokeWidth="3">
+      <circle cx="60" cy="105" r="3" fill="#475569" />
+      <circle cx="60" cy="120" r="3" fill="#475569" />
+      <circle cx="60" cy="135" r="3" fill="#475569" />
+    </g>
+  </svg>
+);
+
 // Updated component to take progress prop
 const PostLoginLoading: React.FC<{ progress: number }> = ({ progress }) => {
   const numFlakes = 150;
@@ -105,6 +139,18 @@ const PostLoginLoading: React.FC<{ progress: number }> = ({ progress }) => {
             width: 90%;
             max-width: 450px;
         }
+        .snowman-container {
+            position: absolute;
+            bottom: 6%;
+            right: 8%;
+            width: 120px;
+            filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.45));
+            animation: gentle-bob 4s ease-in-out infinite;
+        }
+        @keyframes gentle-bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
         .progress-bar {
             width: 100%;
             height: 10px;
@@ -136,6 +182,10 @@ const PostLoginLoading: React.FC<{ progress: number }> = ({ progress }) => {
           <div className="progress-bar-inner" style={{ width: `${progress}%` }}></div>
         </div>
         <p className="mt-3 text-xl font-mono tracking-wider">{Math.floor(progress)}%</p>
+      </div>
+
+      <div className="snowman-container" aria-hidden>
+        <Snowman />
       </div>
     </div>
   );
