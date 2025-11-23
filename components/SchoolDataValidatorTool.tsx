@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 import { School } from '../types';
 import { SpinnerIcon, CheckIcon, GlobeIcon, StopIcon, RefreshIcon } from './icons';
 
@@ -37,8 +37,6 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
         setLogs([]);
         addLog("Starting school data validation...");
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
         // Process in small batches to avoid rate limits and allow stopping
         for (let i = 0; i < schools.length; i++) {
             if (stopRef.current) {
@@ -55,13 +53,14 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
             try {
                 const prompt = `Find the official website URL and the main contact telephone number for the school "${school.name}" located in "${school.location}". Return a JSON object with keys: "website" (string) and "phoneNumber" (string). If not found, return empty strings.`;
                 
-                const response = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: prompt,
-                    config: { tools: [{ googleSearch: {} }], responseMimeType: 'application/json' }
+                const model = getGeminiModel('gemini-2.5-flash');
+                const response = await model.generateContent({
+                    contents: [{ role: 'user', parts: [{ text: prompt }]}],
+                    tools: [{ googleSearch: {} }],
+                    responseMimeType: 'application/json'
                 });
 
-                const result = JSON.parse(response.text.trim());
+                const result = JSON.parse(response.response.text().trim());
                 let needsUpdate = false;
                 const updates: string[] = [];
 

@@ -1,0 +1,55 @@
+name: Build and Deploy to Cloud Run (Docker)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      SERVICE: ${{ vars.CLOUD_RUN_SERVICE || 'school-recruitment-crm' }}
+      REGION: ${{ vars.GCP_REGION || 'europe-west1' }}
+      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      IMAGE: ${{ format('{0}-docker.pkg.dev/{1}/cloud-run/{2}:{3}', vars.GCP_REGION || 'europe-west1', secrets.GCP_PROJECT_ID, vars.CLOUD_RUN_SERVICE || 'school-recruitment-crm', github.sha) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg VITE_GEMINI_API_KEY="${{ secrets.VITE_GEMINI_API_KEY }}" \
+            -t $IMAGE .
+
+      - name: Push image to Artifact Registry
+        run: docker push $IMAGE
+
+      - name: Deploy to Cloud Run
+        env:
+          CLOUDSDK_CORE_PROJECT: ${{ env.PROJECT_ID }}
+        run: |
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image $IMAGE \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated
