@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getGeminiModel } from '../services/gemini';
+import { generateGeminiJson } from '../services/gemini';
 import { CrmData, School, Candidate, JobAlert } from '../types';
 import { SpinnerIcon, SearchIcon, UsersIcon, SchoolIcon, JobAlertsIcon } from './icons';
 
@@ -90,10 +90,14 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{SEARCH_QUERY}}', searchQuery);
 
-            const model = getGeminiModel('gemini-1.5-flash');
-            const response = await model.generateContent({ prompt: fullPrompt });
-
-            const result = JSON.parse(response.response.text().trim());
+            const { data: result, error, rawText } = await generateGeminiJson<{ candidateMatches: any[]; schoolMatches: any[]; jobMatches: any[] }>(
+                fullPrompt,
+                { candidateMatches: [], schoolMatches: [], jobMatches: [] }
+            );
+            if (error) {
+                setError("AI response looked off; showing best available matches.");
+            }
+            console.debug('Candidate matcher raw AI response:', rawText);
             setResults({
                 candidateMatches: result.candidateMatches || [],
                 schoolMatches: result.schoolMatches || [],

@@ -1,16 +1,15 @@
-import { getGeminiModel } from "../services/gemini";
+import { generateGeminiText } from "../services/gemini";
 
 async function main() {
-  const model = getGeminiModel("gemini-1.5-flash");
-
   try {
-    const result = await model.generateContent({ prompt: "Health check: please reply with OK." });
-
-    const text = result.response?.text?.();
+    const { rawText, error } = await generateGeminiText("Health check: please reply with OK.");
 
     console.log("Gemini connection succeeded.");
-    if (text) {
-      console.log("Sample response:", text.slice(0, 200));
+    if (rawText) {
+      console.log("Sample response:", rawText.slice(0, 200));
+    }
+    if (error) {
+      console.warn("Warning: Gemini reported an issue:", error);
     }
   } catch (error) {
     console.error("Gemini connection failed:", error?.message ?? error);
