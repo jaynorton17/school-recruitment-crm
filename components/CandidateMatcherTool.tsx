@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { getGeminiModel } from '../genaiClient';
 import { CrmData, School, Candidate, JobAlert } from '../types';
 import { SpinnerIcon, SearchIcon, UsersIcon, SchoolIcon, JobAlertsIcon } from './icons';
 
@@ -80,8 +80,6 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
         setResults(null);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
             const dataSummary = {
                 schools: crmData.schools.map(s => ({ name: s.name, location: s.location, engagement: s.engagementScore })),
                 candidates: crmData.candidates.map(c => ({ name: c.name, location: c.location, drives: c.drives, availability: c.availability, notes: c.notes })),
@@ -92,13 +90,13 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{SEARCH_QUERY}}', searchQuery);
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: fullPrompt,
-                config: { responseMimeType: "application/json" }
+            const model = getGeminiModel('gemini-2.5-flash');
+            const response = await model.generateContent({
+                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}],
+                responseMimeType: "application/json"
             });
-            
-            const result = JSON.parse(response.text.trim());
+
+            const result = JSON.parse(response.response.text().trim());
             setResults({
                 candidateMatches: result.candidateMatches || [],
                 schoolMatches: result.schoolMatches || [],
