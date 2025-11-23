@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 import { School } from '../types';
 import { SpinnerIcon, CheckIcon, GlobeIcon, StopIcon, RefreshIcon } from './icons';
 
@@ -53,12 +53,8 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
             try {
                 const prompt = `Find the official website URL and the main contact telephone number for the school "${school.name}" located in "${school.location}". Return a JSON object with keys: "website" (string) and "phoneNumber" (string). If not found, return empty strings.`;
                 
-                const model = getGeminiModel('gemini-2.5-flash');
-                const response = await model.generateContent({
-                    contents: [{ role: 'user', parts: [{ text: prompt }]}],
-                    tools: [{ googleSearch: {} }],
-                    responseMimeType: 'application/json'
-                });
+                const model = getGeminiModel('gemini-1.5-flash');
+                const response = await model.generateContent({ prompt });
 
                 const result = JSON.parse(response.response.text().trim());
                 let needsUpdate = false;

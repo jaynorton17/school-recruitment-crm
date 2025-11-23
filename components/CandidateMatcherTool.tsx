@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 import { CrmData, School, Candidate, JobAlert } from '../types';
 import { SpinnerIcon, SearchIcon, UsersIcon, SchoolIcon, JobAlertsIcon } from './icons';
 
@@ -90,11 +90,8 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{SEARCH_QUERY}}', searchQuery);
 
-            const model = getGeminiModel('gemini-2.5-flash');
-            const response = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}],
-                responseMimeType: "application/json"
-            });
+            const model = getGeminiModel('gemini-1.5-flash');
+            const response = await model.generateContent({ prompt: fullPrompt });
 
             const result = JSON.parse(response.response.text().trim());
             setResults({

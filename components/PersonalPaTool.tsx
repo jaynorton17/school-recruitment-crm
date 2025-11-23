@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 import { CrmData, SuggestedCallList, CustomDialerList } from '../types';
 import { SpinnerIcon, PersonalPaIcon, EditIcon } from './icons';
 
@@ -61,11 +61,8 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
 
             const fullPrompt = personalPaPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
-            const model = getGeminiModel('gemini-2.5-flash');
-            const response = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}],
-                responseMimeType: "application/json"
-            });
+            const model = getGeminiModel('gemini-1.5-flash');
+            const response = await model.generateContent({ prompt: fullPrompt });
             const result = JSON.parse(response.response.text().trim());
 
             if (result.briefing) {

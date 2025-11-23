@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { School, CallLog } from '../types';
 import { SpinnerIcon, AddIcon, TrashIcon, MicIcon, StopIcon, ExportIcon } from './icons';
 import { formatDateTimeUK, fileToBase64, autoformatDateInput } from '../utils';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 
 interface AddCallLogModalProps {
     isOpen: boolean;
@@ -106,24 +106,11 @@ const AddCallLogModal: React.FC<AddCallLogModalProps> = ({ isOpen, onClose, onSu
 
         try {
             if (file.type.startsWith('audio/')) {
-                const model = getGeminiModel('gemini-2.5-flash');
+                const model = getGeminiModel('gemini-1.5-flash');
                 const audioBytes = await fileToBase64(file);
-                const audioPart = {
-                    inlineData: {
-                        data: audioBytes,
-                        mimeType: file.type,
-                    },
-                };
+                const prompt = `Transcribe this audio of a phone call for a school recruitment CRM. The audio is base64 encoded with mime type ${file.type}: ${audioBytes}`;
 
-                const result = await model.generateContent({
-                    contents: [{
-                        role: 'user',
-                        parts: [
-                            audioPart,
-                            { text: "Transcribe this audio of a phone call for a school recruitment CRM." }
-                        ]
-                    }]
-                });
+                const result = await model.generateContent({ prompt });
 
                 const transcript = result.response.text();
                 if (transcript) {

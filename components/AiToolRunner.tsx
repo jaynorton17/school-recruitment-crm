@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 import { CrmData } from '../types';
 import { SpinnerIcon } from './icons';
 
@@ -36,10 +36,8 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{CONTEXT}}', context);
 
-            const model = getGeminiModel('gemini-2.5-flash');
-            const response = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}]
-            });
+            const model = getGeminiModel('gemini-1.5-flash');
+            const response = await model.generateContent({ prompt: fullPrompt });
 
             setResult(response.response.text());
 

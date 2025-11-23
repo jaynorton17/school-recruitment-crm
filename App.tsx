@@ -4,8 +4,7 @@ import { PublicClientApplication, AccountInfo } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from './authConfig';
 import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, addNote, addTask, addEmail, getWorksheetMap, updateTask, deleteTask, getUserEmails, updateSchool, getUserProfile, updateSpokenToCoverManagerStatus, updateNote, deleteNote, sendEmail, addOpportunity, updateOpportunity, deleteOpportunity, deleteCallLog, updateCallLog, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate, clearAllEmailTemplates, addEmailTemplateAttachment, deleteEmailTemplateAttachment, updateOpportunityNotes, updateCallLogTranscript, addAnnouncement, clearAllEmailTemplateAttachments, addBooking, deleteBooking, updateBooking, updateCandidate, addCandidate, addJobAlert, deleteJobAlert } from './graph';
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
-import { ChatSession } from '@google/generative-ai';
-import { getGeminiModel } from './genaiClient';
+import { getGeminiModel } from './services/gemini';
 
 
 import Sidebar from './components/Sidebar';
@@ -217,7 +216,6 @@ const App: React.FC = () => {
     const [coachReport, setCoachReport] = useState<CoachReportData | null>(null);
     const [salesStrategistReport, setSalesStrategistReport] = useState<{ suggestions: AiSuggestion[], suggestedCallList: SuggestedCallList } | null>(null);
     const [strategicPlannerReport, setStrategicPlannerReport] = useState<string | null>(null);
-    const [coachChatSession, setCoachChatSession] = useState<ChatSession | null>(null);
     const [coachChatHistory, setCoachChatHistory] = useState<CoachChatMessage[]>([]);
     const [isCoachResponding, setIsCoachResponding] = useState(false);
     // Background Transcription State
@@ -512,12 +510,8 @@ const App: React.FC = () => {
         `;
 
         try {
-            const model = getGeminiModel('gemini-2.5-flash');
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }]}],
-                tools: [{ googleSearch: {} }],
-                responseMimeType: "application/json"
-            });
+            const model = getGeminiModel('gemini-1.5-flash');
+            const result = await model.generateContent({ prompt });
             const extracted = JSON.parse(result.response.text().trim());
             
             let updatedSchool = { ...school };
@@ -866,11 +860,8 @@ const App: React.FC = () => {
                 emails: crmDataForReport.emails.slice(0, 50).map(e => ({ subject: e.subject, date: e.date, direction: e.direction })),
             };
             const fullPrompt = coachPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
-            const model = getGeminiModel('gemini-2.5-flash');
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: fullPrompt }]}],
-                responseMimeType: "application/json"
-            });
+            const model = getGeminiModel('gemini-1.5-flash');
+            const result = await model.generateContent({ prompt: fullPrompt });
             const report = JSON.parse(result.response.text().trim());
             setCoachReport(report);
             localStorage.setItem('coachReport', JSON.stringify(report));
@@ -1053,11 +1044,8 @@ const App: React.FC = () => {
         `;
 
         try {
-            const model = getGeminiModel('gemini-2.5-flash');
-            const result = await model.generateContent({
-                contents: [{ role: 'user', parts: [{ text: prompt }]}],
-                responseMimeType: "application/json"
-            });
+            const model = getGeminiModel('gemini-1.5-flash');
+            const result = await model.generateContent({ prompt });
             const parsedResult = JSON.parse(result.response.text().trim());
 
             setAiGeneratedNotes(parsedResult.notes || '');
@@ -1149,18 +1137,14 @@ const App: React.FC = () => {
         setCoachChatHistory(newHistory);
 
         try {
-             let chat = coachChatSession;
-             if (!chat) {
-                 const context = JSON.stringify(coachReport || {});
-                 const systemInstruction = `You are an AI sales coach for a recruiter. Your goal is to help them improve performance based on their KPI report: ${context}. Be encouraging but direct.`;
-                 const model = getGeminiModel('gemini-2.5-flash');
-                 chat = model.startChat({
-                     systemInstruction,
-                 });
-                 setCoachChatSession(chat);
-             }
-
-             const result = await chat.sendMessage(message);
+             const context = JSON.stringify(coachReport || {});
+             const systemInstruction = `You are an AI sales coach for a recruiter. Your goal is to help them improve performance based on their KPI report: ${context}. Be encouraging but direct.`;
+             const historyText = newHistory
+                 .map(entry => `${entry.role === 'user' ? 'User' : 'Coach'}: ${entry.parts[0].text}`)
+                 .join('\n');
+             const prompt = `${systemInstruction}\n\nConversation so far:\n${historyText}\nCoach response:`;
+             const model = getGeminiModel('gemini-1.5-flash');
+             const result = await model.generateContent({ prompt });
              const response = result.response.text();
              setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: response }] }]);
 
@@ -1222,11 +1206,8 @@ const App: React.FC = () => {
                     If no jobs are found, return an empty "jobs" array.
                 `;
                 
-                const model = getGeminiModel('gemini-2.5-flash');
-                const result = await model.generateContent({
-                    contents: [{ role: 'user', parts: [{ text: prompt }]}],
-                    tools: [{ googleSearch: {} }]
-                });
+                const model = getGeminiModel('gemini-1.5-flash');
+                const result = await model.generateContent({ prompt });
     
                 const responseText = result.response.text()?.trim();
                 if (!responseText) {

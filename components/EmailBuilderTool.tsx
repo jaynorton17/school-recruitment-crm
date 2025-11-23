@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 import { CrmData, School } from '../types';
 import { SpinnerIcon, ClipboardIcon } from './icons';
 
@@ -64,11 +64,8 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
                         .replace('{{CONTEXT}}', context)
                         .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
                     
-                    const model = getGeminiModel('gemini-2.5-flash');
-                    const response = await model.generateContent({
-                        contents: [{ role: 'user', parts: [{ text: populatedPrompt }]}],
-                        responseMimeType: 'application/json',
-                    });
+                    const model = getGeminiModel('gemini-1.5-flash');
+                    const response = await model.generateContent({ prompt: populatedPrompt });
 
                     const result = JSON.parse(response.response.text().trim());
                     setGeneratedContent(result);
