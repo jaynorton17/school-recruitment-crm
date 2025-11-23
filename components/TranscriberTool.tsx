@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { getGeminiModel } from '../genaiClient';
 import { CrmData, CallLog } from '../types';
 import { AiIcon, SpinnerIcon, CheckIcon, ExclamationIcon, NotesIcon } from './icons';
+import { parseUKDateTimeString, safeArray } from '../utils';
 
 interface TranscriberToolProps {
     crmData: CrmData;
@@ -53,12 +54,15 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
     const [status, setStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
     const [expandedTranscriptId, setExpandedTranscriptId] = useState<number | null>(null);
 
-    const transcribedCalls = useMemo(() =>
-        [...crmData.callLogs]
+    const transcribedCalls = useMemo(() => {
+        return safeArray(crmData.callLogs)
             .filter(log => log.transcript && log.transcript.trim() !== '')
-            .sort((a, b) => new Date(b.dateCalled).getTime() - new Date(a.dateCalled).getTime()),
-        [crmData.callLogs]
-    );
+            .sort((a, b) => {
+                const dateA = parseUKDateTimeString(a.dateCalled)?.getTime() || 0;
+                const dateB = parseUKDateTimeString(b.dateCalled)?.getTime() || 0;
+                return dateB - dateA;
+            });
+    }, [crmData.callLogs]);
 
     const checkMissedNotes = async () => {
         setIsLoading(true);

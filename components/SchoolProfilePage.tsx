@@ -112,20 +112,37 @@ const SchoolProfilePage: React.FC<SchoolProfilePageProps> = (props) => {
     };
 
     const handleSave = async () => {
-        await onUpdateSchool(editableSchool);
-        setIsEditing(false);
+        try {
+            await onUpdateSchool(editableSchool);
+            setIsEditing(false);
+        } catch (error) {
+            console.error('Failed to save school details', error);
+            alert('Could not save school details. Please try again.');
+        }
     };
 
     const handleUpdateContacts = async () => {
         setIsUpdatingContacts(true);
-        await onUpdateContactDetails(school);
-        setIsUpdatingContacts(false);
+        try {
+            await onUpdateContactDetails(school);
+        } catch (error) {
+            console.error('Contact detail refresh failed', error);
+            alert('Could not refresh contact details for this school. Please try again.');
+        } finally {
+            setIsUpdatingContacts(false);
+        }
     };
 
     const handleUpdateJobs = async () => {
         setIsUpdatingJobs(true);
-        await onUpdateJobs(school);
-        setIsUpdatingJobs(false);
+        try {
+            await onUpdateJobs(school);
+        } catch (error) {
+            console.error('Job scan failed for school', error);
+            alert('Job scan failed for this school. Please try again.');
+        } finally {
+            setIsUpdatingJobs(false);
+        }
     }
 
     const colors = {
