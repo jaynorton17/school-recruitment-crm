@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getGeminiModel } from '../services/gemini';
+import { generateGeminiJson } from '../services/gemini';
 import { CrmData, School } from '../types';
 import { SpinnerIcon, ClipboardIcon } from './icons';
 
@@ -63,12 +63,13 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
                         .replace('{{SCHOOL_NAME}}', selectedSchoolName)
                         .replace('{{CONTEXT}}', context)
                         .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
-                    
-                    const model = getGeminiModel('gemini-1.5-flash');
-                    const response = await model.generateContent({ prompt: populatedPrompt });
 
-                    const result = JSON.parse(response.response.text().trim());
+                    const { data: result, error, rawText } = await generateGeminiJson<any>(populatedPrompt, {});
                     setGeneratedContent(result);
+                    if (error) {
+                        console.debug('Email builder raw AI response:', rawText);
+                        setError('AI output looked unusual. Please review before sending.');
+                    }
                 } catch (e) {
                     console.error("Failed to generate email content:", e);
                     setError("Failed to generate content. Please try again.");

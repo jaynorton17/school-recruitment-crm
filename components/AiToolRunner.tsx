@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getGeminiModel } from '../services/gemini';
+import { generateGeminiText } from '../services/gemini';
 import { CrmData } from '../types';
 import { SpinnerIcon } from './icons';
 
@@ -36,10 +36,11 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{CONTEXT}}', context);
 
-            const model = getGeminiModel('gemini-1.5-flash');
-            const response = await model.generateContent({ prompt: fullPrompt });
-
-            setResult(response.response.text());
+            const { rawText, error } = await generateGeminiText(fullPrompt);
+            setResult(rawText || '');
+            if (error) {
+                setError('Sorry, the AI is having a moment. Please try again later.');
+            }
 
         } catch (e) {
             console.error(`Failed to generate AI result for ${tool.name}:`, e);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getGeminiModel } from '../services/gemini';
+import { generateGeminiJson } from '../services/gemini';
 import { CrmData, SuggestedCallList, CustomDialerList } from '../types';
 import { SpinnerIcon, PersonalPaIcon, EditIcon } from './icons';
 
@@ -61,9 +61,11 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
 
             const fullPrompt = personalPaPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
-            const model = getGeminiModel('gemini-1.5-flash');
-            const response = await model.generateContent({ prompt: fullPrompt });
-            const result = JSON.parse(response.response.text().trim());
+            const { data: result, error, rawText } = await generateGeminiJson<any>(fullPrompt, {});
+            if (error) {
+                setError('AI output looked unusual. Showing best-effort plan.');
+            }
+            console.debug('Personal PA raw AI response:', rawText);
 
             if (result.briefing) {
                 setBriefingText(result.briefing);

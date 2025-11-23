@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { getGeminiModel } from '../services/gemini';
+import { generateGeminiText } from '../services/gemini';
 import { CrmData, CallLog } from '../types';
 import { AiIcon, SpinnerIcon, CheckIcon, ExclamationIcon, NotesIcon } from './icons';
 import { parseUKDateTimeString, safeArray } from '../utils';
@@ -81,9 +81,8 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
         const updatePromises = callsToProcess.map(async (call) => {
             try {
                 const prompt = `Based on the following call transcript, generate a concise summary of 1-3 sentences to be used as call notes. Transcript: "${call.transcript}"`;
-                const model = getGeminiModel('gemini-1.5-flash');
-                const response = await model.generateContent({ prompt });
-                const aiNotes = response.response.text();
+                const { rawText, error } = await generateGeminiText(prompt);
+                const aiNotes = rawText;
 
                 if (aiNotes) {
                     const updatedLog = { ...call, notes: `(AI-Generated) ${aiNotes.trim()}` };
@@ -91,6 +90,9 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
                     return true;
                 }
                 return false;
+                if (error) {
+                    console.debug('Transcriber raw AI response:', rawText);
+                }
             } catch (error) {
                 console.error(`Failed to process call log ${call.excelRowIndex}:`, error);
                 return false;

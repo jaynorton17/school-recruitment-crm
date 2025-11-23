@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { getGeminiModel } from '../services/gemini';
+import { generateGeminiJson } from '../services/gemini';
 import { School } from '../types';
 import { SpinnerIcon, CheckIcon, GlobeIcon, StopIcon, RefreshIcon } from './icons';
 
@@ -53,10 +53,14 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
             try {
                 const prompt = `Find the official website URL and the main contact telephone number for the school "${school.name}" located in "${school.location}". Return a JSON object with keys: "website" (string) and "phoneNumber" (string). If not found, return empty strings.`;
                 
-                const model = getGeminiModel('gemini-1.5-flash');
-                const response = await model.generateContent({ prompt });
-
-                const result = JSON.parse(response.response.text().trim());
+                const { data: result, error, rawText } = await generateGeminiJson<{ website?: string; phoneNumber?: string }>(
+                    prompt,
+                    { website: '', phoneNumber: '' }
+                );
+                if (error) {
+                    addLog(`AI response parse issue for ${school.name}; using best effort.`);
+                }
+                console.debug('Validator raw AI response:', rawText);
                 let needsUpdate = false;
                 const updates: string[] = [];
 

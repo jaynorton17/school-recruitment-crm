@@ -4,7 +4,7 @@ import { PublicClientApplication, AccountInfo } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from './authConfig';
 import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, addNote, addTask, addEmail, getWorksheetMap, updateTask, deleteTask, getUserEmails, updateSchool, getUserProfile, updateSpokenToCoverManagerStatus, updateNote, deleteNote, sendEmail, addOpportunity, updateOpportunity, deleteOpportunity, deleteCallLog, updateCallLog, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate, clearAllEmailTemplates, addEmailTemplateAttachment, deleteEmailTemplateAttachment, updateOpportunityNotes, updateCallLogTranscript, addAnnouncement, clearAllEmailTemplateAttachments, addBooking, deleteBooking, updateBooking, updateCandidate, addCandidate, addJobAlert, deleteJobAlert } from './graph';
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
-import { getGeminiModel } from './services/gemini';
+import { generateGeminiJson, generateGeminiText } from './services/gemini';
 
 
 import Sidebar from './components/Sidebar';
@@ -510,10 +510,14 @@ const App: React.FC = () => {
         `;
 
         try {
-            const model = getGeminiModel('gemini-1.5-flash');
-            const result = await model.generateContent({ prompt });
-            const extracted = JSON.parse(result.response.text().trim());
-            
+            const { data: extracted, error, rawText } = await generateGeminiJson<{ website?: string; contactNumber?: string; email?: string; deputyHead?: string; deputyHeadEmail?: string }>(
+                prompt,
+                { website: '', contactNumber: '', email: '', deputyHead: '', deputyHeadEmail: '' }
+            );
+            if (error) {
+                console.debug('Contact update raw AI response:', rawText);
+            }
+
             let updatedSchool = { ...school };
             const changes: string[] = [];
     
@@ -860,9 +864,10 @@ const App: React.FC = () => {
                 emails: crmDataForReport.emails.slice(0, 50).map(e => ({ subject: e.subject, date: e.date, direction: e.direction })),
             };
             const fullPrompt = coachPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
-            const model = getGeminiModel('gemini-1.5-flash');
-            const result = await model.generateContent({ prompt: fullPrompt });
-            const report = JSON.parse(result.response.text().trim());
+            const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, {});
+            if (error) {
+                console.debug('Coach report raw AI response:', rawText);
+            }
             setCoachReport(report);
             localStorage.setItem('coachReport', JSON.stringify(report));
             localStorage.setItem('coachReportTimestamp', new Date().toISOString());
@@ -1044,14 +1049,16 @@ const App: React.FC = () => {
         `;
 
         try {
-            const model = getGeminiModel('gemini-1.5-flash');
-            const result = await model.generateContent({ prompt });
-            const parsedResult = JSON.parse(result.response.text().trim());
+            const { data: parsedResult, error, rawText } = await generateGeminiJson<any>(prompt, {});
 
             setAiGeneratedNotes(parsedResult.notes || '');
             setSuggestedTasks(parsedResult.tasks?.map((t: any, i: number) => ({ id: `ai_task_${Date.now()}_${i}`, ...t })) || []);
             setAiGeneratedEmail(parsedResult.email || null);
             setIsTaskSuggestionModalOpen(true);
+
+            if (error) {
+                console.debug('Transcript suggestion raw AI response:', rawText);
+            }
 
         } catch (e) {
             console.error("AI notes generation failed:", e);
@@ -1142,11 +1149,12 @@ const App: React.FC = () => {
              const historyText = newHistory
                  .map(entry => `${entry.role === 'user' ? 'User' : 'Coach'}: ${entry.parts[0].text}`)
                  .join('\n');
-             const prompt = `${systemInstruction}\n\nConversation so far:\n${historyText}\nCoach response:`;
-             const model = getGeminiModel('gemini-1.5-flash');
-             const result = await model.generateContent({ prompt });
-             const response = result.response.text();
-             setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: response }] }]);
+            const prompt = `${systemInstruction}\n\nConversation so far:\n${historyText}\nCoach response:`;
+            const { rawText, error } = await generateGeminiText(prompt);
+            setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: rawText || "I'm still thinking..." }] }]);
+            if (error) {
+                console.debug('Coach chat raw AI response:', rawText);
+            }
 
         } catch (e) {
             console.error("Coach chat error:", e);
@@ -1206,21 +1214,12 @@ const App: React.FC = () => {
                     If no jobs are found, return an empty "jobs" array.
                 `;
                 
-                const model = getGeminiModel('gemini-1.5-flash');
-                const result = await model.generateContent({ prompt });
-    
-                const responseText = result.response.text()?.trim();
-                if (!responseText) {
-                    throw new Error("AI returned an empty response.");
+                const { data: parsedResult, error, rawText } = await generateGeminiJson<{ jobs: any[] }>(prompt, { jobs: [] });
+                if (error) {
+                    console.debug('Job search raw AI response:', rawText);
+                    addLog('-> AI response was unclear; using best effort to parse jobs.');
                 }
 
-                // The model's response might not be perfect JSON, so let's clean it up.
-                // It often includes ```json ... ``` markdown block.
-                const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-                const jsonString = jsonMatch ? jsonMatch[1] : responseText;
-
-                const parsedResult = JSON.parse(jsonString);
-                
                 if (parsedResult.jobs && parsedResult.jobs.length > 0) {
                     addLog(`Found ${parsedResult.jobs.length} potential jobs for ${school.name}.`);
                     setJobSearchSummary(prev => ({ ...prev!, found: prev!.found + parsedResult.jobs.length }));
