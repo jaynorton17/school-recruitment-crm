@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { getGeminiModel } from '../genaiClient';
+import { getGeminiModel } from '../services/gemini';
 import { CrmData, CallLog } from '../types';
 import { AiIcon, SpinnerIcon, CheckIcon, ExclamationIcon, NotesIcon } from './icons';
 import { parseUKDateTimeString, safeArray } from '../utils';
@@ -81,8 +81,8 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
         const updatePromises = callsToProcess.map(async (call) => {
             try {
                 const prompt = `Based on the following call transcript, generate a concise summary of 1-3 sentences to be used as call notes. Transcript: "${call.transcript}"`;
-                const model = getGeminiModel('gemini-2.5-flash');
-                const response = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }]}] });
+                const model = getGeminiModel('gemini-1.5-flash');
+                const response = await model.generateContent({ prompt });
                 const aiNotes = response.response.text();
 
                 if (aiNotes) {
