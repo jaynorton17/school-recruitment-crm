@@ -103,7 +103,40 @@ export const generateGeminiJson = async <T extends object>(
   fallback: T,
   modelName = "gemini-1.5-flash"
 ): Promise<GeminiJsonResult<T>> => {
-  const { rawText, error } = await generateGeminiText(prompt, modelName);
-  const { data, error: parseError } = safeExtractGeminiJson<T>(rawText, fallback);
-  return { rawText, data, error: error ?? parseError };
+  try {
+    const model = await getGeminiModel(modelName);
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    const rawText = result.response.text().trim();
+    console.debug("Gemini raw response:", rawText);
+
+    if (!rawText) {
+      return { rawText, data: fallback, error: "Gemini returned an empty response." };
+    }
+
+    try {
+      const parsed = JSON.parse(rawText) as T;
+      return { rawText, data: parsed };
+    } catch (parseError) {
+      const { data, error } = safeExtractGeminiJson<T>(rawText, fallback);
+      return {
+        rawText,
+        data,
+        error: error ?? `Failed to parse Gemini JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`,
+      };
+    }
+  } catch (error) {
+    console.error("Gemini call failed:", error);
+    return { rawText: "", data: fallback, error: error instanceof Error ? error.message : "Unknown Gemini error" };
+  }
 };

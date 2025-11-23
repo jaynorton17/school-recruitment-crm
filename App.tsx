@@ -1052,7 +1052,9 @@ const App: React.FC = () => {
             const model = await getGeminiModel("gemini-1.5-flash");
             const result = await model.generateContent({
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
-                responseMimeType: "application/json"
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
             });
 
             const raw = result.response.text().trim();
