@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 export interface GeminiTextResult {
   rawText: string;
   error: string | null;
@@ -28,14 +26,35 @@ export function extractGeminiText(response: any): string {
   }
 }
 
-export async function getGeminiModel(modelName: string) {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey) {
+function getGeminiApiKey(): string {
+  // Support both Vite (browser build) and direct Node execution (scripts).
+  const runtimeEnv = typeof process !== "undefined" ? (process as any).env : undefined;
+  const key = import.meta?.env?.VITE_GEMINI_API_KEY ?? runtimeEnv?.VITE_GEMINI_API_KEY;
+  if (!key) {
     throw new Error("Gemini API key is not configured.");
   }
+  return key;
+}
 
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: modelName });
+async function callGeminiGenerateContent(modelName: string, body: Record<string, any>) {
+  const apiKey = getGeminiApiKey();
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => "");
+    throw new Error(
+      `Gemini API request failed (${response.status} ${response.statusText}). ${errorText || "No response body."}`
+    );
+  }
+
+  return response.json();
 }
 
 const cleanJsonText = (rawText: string) => {
@@ -52,13 +71,12 @@ export async function generateGeminiJson<T>(
   modelName = "gemini-1.5-flash"
 ): Promise<GeminiJsonResult<T>> {
   try {
-    const model = await getGeminiModel(modelName);
-    const result = await model.generateContent({
+    const result = await callGeminiGenerateContent(modelName, {
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    let rawText = extractGeminiText(result.response);
+    let rawText = extractGeminiText(result);
     rawText = cleanJsonText(rawText);
 
     if (!rawText) {
@@ -91,12 +109,11 @@ export async function generateGeminiText(
   modelName = "gemini-1.5-flash"
 ): Promise<GeminiTextResult> {
   try {
-    const model = await getGeminiModel(modelName);
-    const result = await model.generateContent({
+    const result = await callGeminiGenerateContent(modelName, {
       contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
 
-    const rawText = extractGeminiText(result.response)?.trim() ?? "";
+    const rawText = extractGeminiText(result)?.trim() ?? "";
     return { rawText, error: null };
   } catch (err: any) {
     return { rawText: "", error: err?.message ?? "Unknown Gemini error" };
