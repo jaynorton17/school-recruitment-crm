@@ -41,13 +41,15 @@ jobs:
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
 
-      - name: Deploy to Cloud Run
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE }}
-          region: ${{ env.REGION }}
-          image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}'
-          flags: '--allow-unauthenticated'
+        - name: Deploy to Cloud Run
+          uses: google-github-actions/deploy-cloudrun@v2
+          with:
+            service: ${{ env.SERVICE }}
+            region: ${{ env.REGION }}
+            image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}'
+            environment_variables: |
+              VITE_GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            flags: '--allow-unauthenticated --set-env-vars "VITE_GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"'
 
       - name: Show URL
         run: echo ${{ steps.deploy.outputs.url }}
