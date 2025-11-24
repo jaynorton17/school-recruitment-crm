@@ -15,7 +15,7 @@ Respond with "OK" in the status field if healthy. Use an empty string if uncerta
 
 Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
-    const { rawText, error } = await generateGeminiText(healthPrompt, "gemini-1.5-flash");
+    const { rawText, error } = await generateGeminiText(healthPrompt);
 
     console.log("Gemini connection succeeded.");
     if (rawText) {
