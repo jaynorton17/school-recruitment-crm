@@ -84,17 +84,20 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
                 const { rawText, error } = await generateGeminiText(prompt);
                 const aiNotes = rawText;
 
+                if (error) {
+                    console.debug('Transcriber raw AI response:', rawText);
+                    alert('AI Error: ' + error);
+                }
+
                 if (aiNotes) {
                     const updatedLog = { ...call, notes: `(AI-Generated) ${aiNotes.trim()}` };
                     await onUpdateCallLog(updatedLog);
                     return true;
                 }
                 return false;
-                if (error) {
-                    console.debug('Transcriber raw AI response:', rawText);
-                }
             } catch (error) {
                 console.error(`Failed to process call log ${call.excelRowIndex}:`, error);
+                alert('AI Error: ' + (error instanceof Error ? error.message : 'Unable to generate notes.'));
                 return false;
             }
         });

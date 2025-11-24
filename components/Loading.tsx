@@ -1,5 +1,6 @@
 import React from 'react';
 import { SpinnerIcon } from './icons';
+import AnimatedChristmasTree from './AnimatedChristmasTree';
 import styles from './Loading.module.css';
 
 const santaSvg = (
@@ -54,17 +55,6 @@ const Loading: React.FC = () => {
             <div className={styles.santa}>{santaSvg}</div>
 
             <div className={styles.contentBox}>
-                <div className={styles.tree}>
-                    <div className={styles.treeTop}></div>
-                    <div className={styles.trunk}></div>
-                    <div className={styles.star}></div>
-                    <div className={styles.bauble}></div>
-                    <div className={styles.bauble}></div>
-                    <div className={styles.bauble}></div>
-                    <div className={styles.bauble}></div>
-                    <div className={styles.bauble}></div>
-                </div>
-
                 <h1 className={styles.title}>EduTalent Connect CRM</h1>
 
                 <div className={styles.status}>
@@ -72,6 +62,7 @@ const Loading: React.FC = () => {
                     <p className="text-lg">Initializing...</p>
                 </div>
             </div>
+            <AnimatedChristmasTree className="absolute bottom-6 left-6" />
         </div>
     );
 };

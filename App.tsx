@@ -4,7 +4,7 @@ import { PublicClientApplication, AccountInfo } from "@azure/msal-browser";
 import { msalConfig, loginRequest } from './authConfig';
 import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, addNote, addTask, addEmail, getWorksheetMap, updateTask, deleteTask, getUserEmails, updateSchool, getUserProfile, updateSpokenToCoverManagerStatus, updateNote, deleteNote, sendEmail, addOpportunity, updateOpportunity, deleteOpportunity, deleteCallLog, updateCallLog, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate, clearAllEmailTemplates, addEmailTemplateAttachment, deleteEmailTemplateAttachment, updateOpportunityNotes, updateCallLogTranscript, addAnnouncement, clearAllEmailTemplateAttachments, addBooking, deleteBooking, updateBooking, updateCandidate, addCandidate, addJobAlert, deleteJobAlert } from './graph';
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
-import { generateGeminiJson, generateGeminiText, getGeminiModel } from './services/gemini';
+import { generateGeminiJson, generateGeminiText } from './services/gemini';
 
 
 import Sidebar from './components/Sidebar';
@@ -516,6 +516,7 @@ const App: React.FC = () => {
             );
             if (error) {
                 console.debug('Contact update raw AI response:', rawText);
+                alert('AI Error: ' + error);
             }
 
             let updatedSchool = { ...school };
@@ -550,6 +551,7 @@ const App: React.FC = () => {
             }
         } catch (e: any) {
             console.error("Failed to update contacts via AI", e);
+            alert("AI Error: " + (e?.message || 'Could not fetch contact details.'));
             updateBackgroundTask(taskId, 'error', 'AI failed to find contact details.');
         }
     };
@@ -867,6 +869,7 @@ const App: React.FC = () => {
             const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, {});
             if (error) {
                 console.debug('Coach report raw AI response:', rawText);
+                alert('AI Error: ' + error);
             }
             setCoachReport(report);
             localStorage.setItem('coachReport', JSON.stringify(report));
@@ -874,6 +877,7 @@ const App: React.FC = () => {
             updateBackgroundTask(taskId, 'success', 'AI Coach report updated.');
         } catch (e) {
             console.error("Coach report generation failed:", e);
+            alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to generate coach report.'));
             updateBackgroundTask(taskId, 'error', 'AI Coach report failed.');
         }
     }, [addBackgroundTask, updateBackgroundTask]);
@@ -1049,46 +1053,18 @@ const App: React.FC = () => {
         `;
 
         try {
-            const model = await getGeminiModel("gemini-1.5-flash");
-            const result = await model.generateContent({
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseMimeType: "application/json"
-                }
-            });
+            const { data: parsed, rawText, error } = await generateGeminiJson<any>(prompt, { notes: "", tasks: [], email: {} });
 
-            const raw = result.response.text().trim();
-            console.log("AI RAW:", raw);
-
-            if (!raw) {
-                throw new Error("Gemini returned an empty response.");
-            }
-
-            let parsed: any;
-            try {
-                parsed = JSON.parse(raw);
-            } catch (parseError) {
-                throw new Error(`Failed to parse Gemini JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
-            }
-
-            if (!parsed || typeof parsed !== 'object') {
-                throw new Error("Gemini response was not a valid JSON object.");
+            if (error) {
+                console.debug("AI RAW:", rawText);
             }
 
             const notes = typeof parsed.notes === 'string' ? parsed.notes : '';
             const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : null;
             const email = parsed.email ?? null;
 
-            if (!notes.trim()) {
-                throw new Error("Gemini response is missing required notes content.");
-            }
-
-            if (!tasks) {
-                throw new Error("Gemini response is missing a tasks array.");
-            }
-
-            if (!email || typeof email !== 'object') {
-                throw new Error("Gemini response is missing the email object.");
+            if (!notes.trim() || !tasks || !email || typeof email !== 'object') {
+                throw new Error("Gemini response was missing required fields.");
             }
 
             setAiGeneratedNotes(notes);
@@ -1098,7 +1074,7 @@ const App: React.FC = () => {
 
         } catch (e) {
             console.error("AI notes generation failed:", e);
-            alert("Failed to generate AI suggestions from the transcript.");
+            alert("AI Error: " + (e instanceof Error ? e.message : "Failed to generate AI suggestions from the transcript."));
         } finally {
             setIsGeneratingForTranscript(null);
         }
@@ -1190,10 +1166,12 @@ const App: React.FC = () => {
             setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: rawText || "I'm still thinking..." }] }]);
             if (error) {
                 console.debug('Coach chat raw AI response:', rawText);
+                alert('AI Error: ' + error);
             }
 
         } catch (e) {
             console.error("Coach chat error:", e);
+            alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to contact coach AI.'));
             setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: "I'm having trouble connecting right now. Please try again later." }] }]);
         } finally {
             setIsCoachResponding(false);
@@ -1254,6 +1232,7 @@ const App: React.FC = () => {
                 if (error) {
                     console.debug('Job search raw AI response:', rawText);
                     addLog('-> AI response was unclear; using best effort to parse jobs.');
+                    alert('AI Error: ' + error);
                 }
 
                 if (parsedResult.jobs && parsedResult.jobs.length > 0) {
@@ -1293,6 +1272,7 @@ const App: React.FC = () => {
     
             } catch (e) {
                 console.error(`Error processing ${school.name}:`, e);
+                alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to search for jobs.'));
                 addLog(`-> Error searching for ${school.name}. Skipping.`);
             }
             

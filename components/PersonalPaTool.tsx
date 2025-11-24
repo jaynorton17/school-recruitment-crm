@@ -64,6 +64,7 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
             const { data: result, error, rawText } = await generateGeminiJson<any>(fullPrompt, {});
             if (error) {
                 setError('AI output looked unusual. Showing best-effort plan.');
+                alert('AI Error: ' + error);
             }
             console.debug('Personal PA raw AI response:', rawText);
 
@@ -79,6 +80,7 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
 
         } catch (e) {
             console.error(`Failed to generate AI result for ${tool.name}:`, e);
+            alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to generate briefing.'));
             setError(`Sorry, the AI is having a moment. Please try again later.`);
         } finally {
             setIsLoading(false);
