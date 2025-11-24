@@ -36,9 +36,13 @@ jobs:
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
       - name: Build and Push Container
+        env:
+          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
         run: |
           IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}"
-          docker build -t "$IMAGE" .
+          docker build \
+            --build-arg VITE_GEMINI_API_KEY="$VITE_GEMINI_API_KEY" \
+            -t "$IMAGE" .
           docker push "$IMAGE"
 
       - name: Deploy to Cloud Run
