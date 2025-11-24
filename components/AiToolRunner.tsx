@@ -55,23 +55,7 @@ If the tool instructions would normally return text, place it in the "result" fi
 
 Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
-            const { rawText, error } = await generateGeminiText(fullPrompt, modelName);
-            addAIDebugEvent({
-                id: crypto.randomUUID(),
-                toolName: tool.name,
-                timestamp: Date.now(),
-                prompt: fullPrompt,
-                model: modelName,
-                requestPayload: { prompt: fullPrompt },
-                rawResponse: rawText,
-                cleanedText: rawText || '',
-                parsedJson: null,
-                missingFields: [],
-                error: error || null,
-                errorStack: null,
-                location: "components/AiToolRunner.tsx:44",
-                environment: { envVars }
-            });
+            const { rawText, error } = await generateGeminiText(fullPrompt);
             setResult(rawText || '');
             if (error) {
                 setError('Sorry, the AI is having a moment. Please try again later.');

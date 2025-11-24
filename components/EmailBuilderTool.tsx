@@ -79,7 +79,7 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
                         .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
                     const defaultContent: GeneratedContent = { email: '', sms: '', subjects: [], followup: '' };
-                    const { data: result, error, rawText } = await generateGeminiJson<GeneratedContent>(populatedPrompt, defaultContent, "gemini-1.5-flash");
+                    const { data: result, error, rawText } = await generateGeminiJson<GeneratedContent>(populatedPrompt, defaultContent);
                     const requiredFields = ['email', 'sms', 'subjects', 'followup'];
                     const check = analyseAiResponse(rawText, result, requiredFields, defaultContent, populatedPrompt);
                     if (!check.ok) {

@@ -120,7 +120,7 @@ Return an empty string for transcript if speech cannot be detected.
 
 Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
-                const { rawText, error } = await generateGeminiText(prompt, "gemini-1.5-flash");
+                const { rawText, error } = await generateGeminiText(prompt);
 
                 const transcript = rawText?.trim();
                 if (transcript) {
