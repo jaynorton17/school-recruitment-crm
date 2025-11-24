@@ -11,15 +11,9 @@ export interface GeminiJsonResult<T> extends GeminiTextResult {
 
 export function extractGeminiText(response: any): string {
   try {
-    // New Gemini 1.5 format
     const parts = response?.candidates?.[0]?.content?.parts;
-    if (Array.isArray(parts) && parts[0]?.text) {
+    if (Array.isArray(parts) && typeof parts[0]?.text === "string") {
       return parts[0].text;
-    }
-
-    // Older fallback
-    if (typeof response.text === "function") {
-      return response.text();
     }
 
     return "";
@@ -58,7 +52,10 @@ export async function generateGeminiJson<T>(
       generationConfig: { responseMimeType: "application/json" }
     });
 
-    let rawText = extractGeminiText(result.response);
+    let rawText =
+      typeof result.response?.text === "function"
+        ? result.response.text()
+        : extractGeminiText(result.response);
     rawText = cleanJsonText(rawText);
 
     if (!rawText) {
@@ -92,11 +89,14 @@ export async function generateGeminiText(
 ): Promise<GeminiTextResult> {
   try {
     const model = await getGeminiModel(modelName);
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
-    });
+    const result = await model.generateContent(prompt);
 
-    const rawText = extractGeminiText(result.response)?.trim() ?? "";
+    const rawText =
+      (typeof result.response?.text === "function"
+        ? result.response.text()
+        : extractGeminiText(result.response)
+      )
+        ?.trim() ?? "";
     return { rawText, error: null };
   } catch (err: any) {
     return { rawText: "", error: err?.message ?? "Unknown Gemini error" };
