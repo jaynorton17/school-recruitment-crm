@@ -11,6 +11,7 @@ import StrategicPlannerTool from './StrategicPlannerTool';
 import EmailBuilderTool from './EmailBuilderTool';
 import CandidateMatcherTool from './CandidateMatcherTool';
 import SchoolDataValidatorTool from './SchoolDataValidatorTool';
+import { AiDebugInfo } from '../services/aiDebug';
 
 interface StrategicAiHubProps {
     crmData: CrmData;
@@ -36,6 +37,7 @@ interface StrategicAiHubProps {
     onSendCoachMessage: (message: string) => void;
     isCoachResponding: boolean;
     onUpdateSchool: (school: School) => Promise<void>;
+    openDebug: (debug: AiDebugInfo) => void;
 }
 
 const aiTools = [
@@ -82,19 +84,19 @@ const StrategicAiHub: React.FC<StrategicAiHubProps> = (props) => {
             return <TranscriberTool crmData={props.crmData} onBack={() => setActiveToolId('hub')} onUpdateCallLog={props.onUpdateCallLog} />;
         }
         if (activeTool.id === 'coach') {
-            return <CoachTool 
-                tool={activeTool} 
-                crmData={props.crmData} 
-                onBack={() => setActiveToolId('hub')} 
-                onOpenAddTaskModal={props.onOpenAddTaskModal} 
-                coachReportData={props.coachReport} 
+            return <CoachTool
+                tool={activeTool}
+                crmData={props.crmData}
+                onBack={() => setActiveToolId('hub')}
+                onOpenAddTaskModal={props.onOpenAddTaskModal}
+                coachReportData={props.coachReport}
                 chatHistory={props.coachChatHistory}
                 onSendMessage={props.onSendCoachMessage}
                 isResponding={props.isCoachResponding}
             />;
         }
         if (activeTool.id === 'candidateMatcher') {
-            return <CandidateMatcherTool tool={activeTool} {...props} onBack={() => setActiveToolId('hub')} />;
+            return <CandidateMatcherTool tool={activeTool} {...props} onBack={() => setActiveToolId('hub')} openDebug={props.openDebug} />;
         }
         if (activeTool.id === 'jobAlerts') {
             return <JobAlertsTool 
@@ -112,7 +114,7 @@ const StrategicAiHub: React.FC<StrategicAiHubProps> = (props) => {
         }
         if (activeTool.id === 'personalPa') {
             // @ts-ignore
-            return <PersonalPaTool tool={activeTool} crmData={props.crmData} onBack={() => setActiveToolId('hub')} onSaveCustomDialerList={props.onSaveCustomDialerList} />;
+            return <PersonalPaTool tool={activeTool} crmData={props.crmData} onBack={() => setActiveToolId('hub')} onSaveCustomDialerList={props.onSaveCustomDialerList} openDebug={props.openDebug} />;
         }
         if (activeTool.id === 'strategicPlanner') {
             return <StrategicPlannerTool
@@ -123,10 +125,10 @@ const StrategicAiHub: React.FC<StrategicAiHubProps> = (props) => {
             />;
         }
         if (activeTool.id === 'emailBuilder') {
-            return <EmailBuilderTool tool={activeTool} crmData={props.crmData} onBack={() => setActiveToolId('hub')} />;
+            return <EmailBuilderTool tool={activeTool} crmData={props.crmData} onBack={() => setActiveToolId('hub')} openDebug={props.openDebug} />;
         }
         if (activeTool.id === 'schoolValidator') {
-            return <SchoolDataValidatorTool schools={props.crmData.schools} onUpdateSchool={props.onUpdateSchool} onBack={() => setActiveToolId('hub')} />;
+            return <SchoolDataValidatorTool schools={props.crmData.schools} onUpdateSchool={props.onUpdateSchool} onBack={() => setActiveToolId('hub')} openDebug={props.openDebug} />;
         }
     }
 

@@ -2,7 +2,20 @@ import { generateGeminiText } from "../services/gemini";
 
 async function main() {
   try {
-    const { rawText, error } = await generateGeminiText("Health check: please reply with OK.");
+    const healthPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+
+Health check: confirm the service is reachable.
+
+JSON schema:
+{
+  "status": "string"
+}
+
+Respond with "OK" in the status field if healthy. Use an empty string if uncertain.
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
+
+    const { rawText, error } = await generateGeminiText(healthPrompt);
 
     console.log("Gemini connection succeeded.");
     if (rawText) {

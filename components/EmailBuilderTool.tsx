@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { generateGeminiJson } from '../services/gemini';
 import { CrmData, School } from '../types';
 import { SpinnerIcon, ClipboardIcon } from './icons';
+import { AiDebugInfo, analyseAiResponse } from '../services/aiDebug';
 
 interface EmailBuilderToolProps {
     tool: { id: string; name: string; icon: React.ElementType; };
     crmData: CrmData;
     onBack: () => void;
+    openDebug: (debug: AiDebugInfo) => void;
 }
 
 interface GeneratedContent {
@@ -16,13 +18,23 @@ interface GeneratedContent {
     followup: string;
 }
 
-const emailBuilderPrompt = `You are the EMAIL BUILDER AI. Based on the context provided, generate a professional and personalized outreach communication set.
+const emailBuilderPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
 
-Return a single JSON object with the keys: "email", "sms", "subjects", "followup".
+You are the EMAIL BUILDER AI. Based on the context provided, generate a professional and personalized outreach communication set.
+
+JSON schema:
+{
+  "email": "string",
+  "sms": "string",
+  "subjects": ["string"],
+  "followup": "string"
+}
+
 - "email": A full HTML email body. Use <p> and <strong> tags for structure.
 - "sms": A short SMS version (max 160 characters).
 - "subjects": An array of 3 subject line strings.
 - "followup": A short follow-up line for the next day.
+- If any field cannot be determined, return an empty string or empty array while keeping the schema intact.
 
 Use these smart tags where appropriate: {{school_name}}, {{contact_name}}, {{account_manager_name}}.
 
@@ -31,9 +43,11 @@ Context:
 - Situation: {{CONTEXT}}
 
 CRM Dataset (for context):
-{{CRM_DATASET}}`;
+{{CRM_DATASET}}
 
-const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBack }) => {
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
+
+const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBack, openDebug }) => {
     const [selectedSchoolName, setSelectedSchoolName] = useState('');
     const [context, setContext] = useState('');
     const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
@@ -66,11 +80,22 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
 
                     const defaultContent: GeneratedContent = { email: '', sms: '', subjects: [], followup: '' };
                     const { data: result, error, rawText } = await generateGeminiJson<GeneratedContent>(populatedPrompt, defaultContent);
+                    const requiredFields = ['email', 'sms', 'subjects', 'followup'];
+                    const check = analyseAiResponse(rawText, result, requiredFields, defaultContent, populatedPrompt);
+                    if (!check.ok) {
+                        console.error("AI DEBUG:", check.debug);
+                        setError('AI response was missing required fields.');
+                        alert('AI Error: ' + check.debug.errorMessage);
+                        openDebug(check.debug);
+                        setGeneratedContent(null);
+                        setIsLoading(false);
+                        return;
+                    }
                     const safeResult: GeneratedContent = {
-                        email: typeof result.email === 'string' ? result.email : '',
-                        sms: typeof result.sms === 'string' ? result.sms : '',
-                        subjects: Array.isArray(result.subjects) ? result.subjects.filter((s): s is string => typeof s === 'string') : [],
-                        followup: typeof result.followup === 'string' ? result.followup : '',
+                        email: typeof check.data.email === 'string' ? check.data.email : '',
+                        sms: typeof check.data.sms === 'string' ? check.data.sms : '',
+                        subjects: Array.isArray(check.data.subjects) ? check.data.subjects.filter((s): s is string => typeof s === 'string') : [],
+                        followup: typeof check.data.followup === 'string' ? check.data.followup : '',
                     };
                     setGeneratedContent(safeResult);
                     if (error) {

@@ -5,6 +5,8 @@ import { msalConfig, loginRequest } from './authConfig';
 import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, addNote, addTask, addEmail, getWorksheetMap, updateTask, deleteTask, getUserEmails, updateSchool, getUserProfile, updateSpokenToCoverManagerStatus, updateNote, deleteNote, sendEmail, addOpportunity, updateOpportunity, deleteOpportunity, deleteCallLog, updateCallLog, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate, clearAllEmailTemplates, addEmailTemplateAttachment, deleteEmailTemplateAttachment, updateOpportunityNotes, updateCallLogTranscript, addAnnouncement, clearAllEmailTemplateAttachments, addBooking, deleteBooking, updateBooking, updateCandidate, addCandidate, addJobAlert, deleteJobAlert } from './graph';
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
 import { generateGeminiJson, generateGeminiText } from './services/gemini';
+import AiDebugPanel from './components/AiDebugPanel';
+import { AiDebugInfo, analyseAiResponse } from './services/aiDebug';
 
 
 import Sidebar from './components/Sidebar';
@@ -58,25 +60,27 @@ interface UserProfile {
     mobileNumber?: string;
 }
 
-const coachPrompt = `You are the COACH AI for EduTalent Connect, a school recruitment agency. Analyze the recruiter's recent activity from the provided CRM dataset to generate a structured performance report. Your feedback should be sharp, insightful, and directly aimed at improving their performance in the context of educational recruitment.
+const coachPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
 
-Return a single JSON object with the following structure:
+You are the COACH AI for EduTalent Connect, a school recruitment agency. Analyze the recruiter's recent activity from the provided CRM dataset to generate a structured performance report. Your feedback should be sharp, insightful, and directly aimed at improving their performance in the context of educational recruitment.
+
+JSON schema:
 {
   "kpis": {
-    "callsMade": number,
-    "emailVolume": number,
-    "emailReplies": number,
-    "taskCompletion": number (0-100),
-    "followUpsMissed": number,
-    "schoolsWithEngagement": number
+    "callsMade": "number",
+    "emailVolume": "number",
+    "emailReplies": "number",
+    "taskCompletion": "number",
+    "followUpsMissed": "number",
+    "schoolsWithEngagement": "number"
   },
   "keyInsights": [
-    { "title": "Critical Gaps Detected" | "High-Value Wins" | "Behaviour Patterns" | "Priority Fixes", "description": "string" }
+    { "title": "string", "description": "string" }
   ],
   "strengths": ["string"],
   "weaknesses": ["string"],
   "recommendedActions": [
-    { "description": "string", "schoolName": "string" (optional) }
+    { "description": "string", "schoolName": "string" }
   ]
 }
 
@@ -84,9 +88,12 @@ Return a single JSON object with the following structure:
 -   Provide 2-4 key insights that are specific and actionable for a recruiter.
 -   List 2-3 top strengths and 2-3 main weaknesses.
 -   Suggest 3-5 actionable recommendations. Help the account manager be the best they can be by suggesting things like adding specific value propositions into calls. If an action is for a specific school, include the schoolName.
+-   If information is missing, set the value to an empty string, 0, or an empty array as appropriate.
 
 CRM Dataset:
-{{CRM_DATASET}}`;
+{{CRM_DATASET}}
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
 const strategicPlannerPrompt = `You are the STRATEGIC PLANNER module for the JAY-AI Hub.
 Place all output directly underneath the ‘Strategic Planner’ header.
@@ -117,14 +124,28 @@ Output with clean headings and short, strong descriptions.
 CRM Dataset:
 {{CRM_DATASET}}`;
 
-const personalPaPrompt = `You are the PERSONAL PA AI. Your task is to analyze the provided CRM data and generate a daily briefing for a school recruiter.
+const personalPaPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
 
-Return a single JSON object with two keys: "briefing" and "suggestedCallList".
+You are the PERSONAL PA AI. Your task is to analyze the provided CRM data and generate a daily briefing for a school recruiter.
+
+JSON schema:
+{
+  "briefing": "string",
+  "suggestedCallList": {
+    "name": "string",
+    "reason": "string",
+    "filters": "object"
+  }
+}
+
 - "briefing": A markdown-formatted string. It MUST include a section titled "### Top 5 High-Impact Actions". Also include sections for Overdue Tasks, Today's Priorities, and Opportunities to watch.
 - "suggestedCallList": A single object with "name", "reason", and a complete "filters" object for creating a proactive call list in the dialer.
+- If any value is unavailable, return an empty string or an empty object while keeping schema keys present.
 
 CRM Dataset:
-{{CRM_DATASET}}`;
+{{CRM_DATASET}}
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
 const App: React.FC = () => {
     const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -175,6 +196,14 @@ const App: React.FC = () => {
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [isSearchResultsVisible, setIsSearchResultsVisible] = useState(false);
     const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+    const [aiDebug, setAiDebug] = useState<AiDebugInfo | null>(null);
+    const [isDebugOpen, setIsDebugOpen] = useState(false);
+
+    const openDebug = (debug: AiDebugInfo) => {
+        setAiDebug(debug);
+        setIsDebugOpen(true);
+    };
 
 
     const setActiveView = (view: string) => {
@@ -499,21 +528,38 @@ const App: React.FC = () => {
     const handleUpdateContactDetails = async (school: School) => {
         if (!account) return;
         const taskId = addBackgroundTask(`AI is searching for contact details for ${school.name}...`);
-        const prompt = `Find current contact information for the school named "${school.name}" which is located in or around "${school.location}". Prioritize official school websites.
+        const prompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
 
-        Return a single JSON object with the following keys. If a value cannot be found, return null for that key.
-        - "website": string (the official school website URL)
-        - "contactNumber": string (the main telephone number)
-        - "email": string (the general office/enquiries email, e.g., office@, admin@, enquiries@)
-        - "deputyHead": string (the name of the Deputy Head Teacher or Deputy Headteacher)
-        - "deputyHeadEmail": string (the email for the Deputy Head, if available)
-        `;
+        Find current contact information for the school named "${school.name}" which is located in or around "${school.location}". Prioritize official school websites.
+
+        JSON schema:
+        {
+          "website": "string",
+          "contactNumber": "string",
+          "email": "string",
+          "deputyHead": "string",
+          "deputyHeadEmail": "string"
+        }
+
+        Return values as strings; use empty strings when data is missing.
+
+        Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
         try {
+            const defaults = { website: '', contactNumber: '', email: '', deputyHead: '', deputyHeadEmail: '' };
             const { data: extracted, error, rawText } = await generateGeminiJson<{ website?: string; contactNumber?: string; email?: string; deputyHead?: string; deputyHeadEmail?: string }>(
                 prompt,
-                { website: '', contactNumber: '', email: '', deputyHead: '', deputyHeadEmail: '' }
+                defaults
             );
+            const requiredFields = ['website', 'contactNumber', 'email', 'deputyHead', 'deputyHeadEmail'];
+            const check = analyseAiResponse(rawText, extracted, requiredFields, defaults, prompt);
+            if (!check.ok) {
+                console.error("AI DEBUG:", check.debug);
+                updateBackgroundTask(taskId, 'error', check.debug.errorMessage || 'AI response missing required fields.');
+                alert('AI Error: ' + check.debug.errorMessage);
+                openDebug(check.debug);
+                return;
+            }
             if (error) {
                 console.debug('Contact update raw AI response:', rawText);
                 alert('AI Error: ' + error);
@@ -521,25 +567,25 @@ const App: React.FC = () => {
 
             let updatedSchool = { ...school };
             const changes: string[] = [];
-    
-            if (extracted.website) {
-                updatedSchool.website = extracted.website;
+
+            if (check.data.website) {
+                updatedSchool.website = check.data.website;
                 changes.push('Website');
             }
-            if (extracted.contactNumber) {
-                updatedSchool.contactNumber = extracted.contactNumber;
+            if (check.data.contactNumber) {
+                updatedSchool.contactNumber = check.data.contactNumber;
                 changes.push('Phone');
             }
-            if (extracted.email) {
-                updatedSchool.email = extracted.email;
+            if (check.data.email) {
+                updatedSchool.email = check.data.email;
                 changes.push('Email');
             }
-            if (extracted.deputyHead) {
-                updatedSchool.contact2 = extracted.deputyHead;
+            if (check.data.deputyHead) {
+                updatedSchool.contact2 = check.data.deputyHead;
                 changes.push('Contact 2 (Deputy Head)');
             }
-            if (extracted.deputyHeadEmail) {
-                updatedSchool.contact2Email = extracted.deputyHeadEmail;
+            if (check.data.deputyHeadEmail) {
+                updatedSchool.contact2Email = check.data.deputyHeadEmail;
                 changes.push('Contact 2 Email');
             }
     
@@ -866,13 +912,23 @@ const App: React.FC = () => {
                 emails: crmDataForReport.emails.slice(0, 50).map(e => ({ subject: e.subject, date: e.date, direction: e.direction })),
             };
             const fullPrompt = coachPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
-            const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, {});
+            const defaultReport = { kpis: {}, keyInsights: [], strengths: [], weaknesses: [], recommendedActions: [] };
+            const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultReport);
+            const requiredFields = ['kpis', 'keyInsights', 'strengths', 'weaknesses', 'recommendedActions'];
+            const check = analyseAiResponse(rawText, report, requiredFields, defaultReport, fullPrompt);
+            if (!check.ok) {
+                console.error("AI DEBUG:", check.debug);
+                updateBackgroundTask(taskId, 'error', check.debug.errorMessage || 'AI response missing required fields.');
+                alert('AI Error: ' + check.debug.errorMessage);
+                openDebug(check.debug);
+                return;
+            }
             if (error) {
                 console.debug('Coach report raw AI response:', rawText);
                 alert('AI Error: ' + error);
             }
-            setCoachReport(report);
-            localStorage.setItem('coachReport', JSON.stringify(report));
+            setCoachReport(check.data);
+            localStorage.setItem('coachReport', JSON.stringify(check.data));
             localStorage.setItem('coachReportTimestamp', new Date().toISOString());
             updateBackgroundTask(taskId, 'success', 'AI Coach report updated.');
         } catch (e) {
@@ -1040,28 +1096,55 @@ const App: React.FC = () => {
         setIsGeneratingForTranscript(callLog.excelRowIndex);
         setCallLogForAi(callLog);
 
-        const prompt = `You are an intelligent assistant for a school recruitment agency called "EdU Talent Connect". The user you are assisting is named "${currentUser?.name}".
-        Based on the following call transcript with ${callLog.schoolName}, generate a JSON object with:
-        1. "notes": A concise summary of the call for CRM notes.
-        2. "tasks": An array of suggested follow-up tasks. Each task should be an object with "description", "dueDate" (optional, DD/MM/YYYY), and "dueTime" (optional, HH:MM).
-        3. "email": A draft follow-up email object with "subject" and "body" (HTML format). Use smart tags like {{contact_name}} and {{account_manager_name}}. The email should be signed off by "${currentUser?.name}" from "EdU Talent Connect".
+        const prompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
 
-        Keep the tone professional and relevant to education recruitment.
+        You are an intelligent assistant for a school recruitment agency called "EdU Talent Connect". The user you are assisting is named "${currentUser?.name}".
+        Based on the following call transcript with ${callLog.schoolName}, generate the structured response.
+
+        JSON schema:
+        {
+          "notes": "string",
+          "tasks": [
+            {
+              "description": "string",
+              "dueDate": "DD/MM/YYYY or empty string",
+              "dueTime": "HH:MM or empty string"
+            }
+          ],
+          "email": {
+            "subject": "string",
+            "body": "HTML string"
+          }
+        }
+
+        Use smart tags like {{contact_name}} and {{account_manager_name}} in the email. The email should be signed off by "${currentUser?.name}" from "EdU Talent Connect".
+        If any value is missing, return an empty string or empty array as appropriate.
 
         Transcript:
         "${callLog.transcript}"
-        `;
+
+        Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
         try {
-            const { data: parsed, rawText, error } = await generateGeminiJson<any>(prompt, { notes: "", tasks: [], email: {} });
+            const defaults = { notes: "", tasks: [], email: {} };
+            const { data: parsed, rawText, error } = await generateGeminiJson<any>(prompt, defaults);
+
+            const requiredFields = ['notes', 'tasks', 'email'];
+            const check = analyseAiResponse(rawText, parsed, requiredFields, defaults, prompt);
+            if (!check.ok) {
+                console.error("AI DEBUG:", check.debug);
+                alert('AI Error: ' + check.debug.errorMessage);
+                openDebug(check.debug);
+                return;
+            }
 
             if (error) {
                 console.debug("AI RAW:", rawText);
             }
 
-            const notes = typeof parsed.notes === 'string' ? parsed.notes : '';
-            const tasks = Array.isArray(parsed.tasks) ? parsed.tasks : null;
-            const email = parsed.email ?? null;
+            const notes = typeof check.data.notes === 'string' ? check.data.notes : '';
+            const tasks = Array.isArray(check.data.tasks) ? check.data.tasks : null;
+            const email = check.data.email ?? null;
 
             if (!notes.trim() || !tasks || !email || typeof email !== 'object') {
                 throw new Error("Gemini response was missing required fields.");
@@ -1157,11 +1240,11 @@ const App: React.FC = () => {
 
         try {
              const context = JSON.stringify(coachReport || {});
-             const systemInstruction = `You are an AI sales coach for a recruiter. Your goal is to help them improve performance based on their KPI report: ${context}. Be encouraging but direct.`;
+             const systemInstruction = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.`;
              const historyText = newHistory
                  .map(entry => `${entry.role === 'user' ? 'User' : 'Coach'}: ${entry.parts[0].text}`)
                  .join('\n');
-            const prompt = `${systemInstruction}\n\nConversation so far:\n${historyText}\nCoach response:`;
+            const prompt = `${systemInstruction}\n\nYou are an AI sales coach for a recruiter. Your goal is to help them improve performance based on their KPI report: ${context}. Be encouraging but direct. Respond to the latest user message as structured JSON.\n\nJSON schema:\n{\n  "message": "string"\n}\n\nConversation so far:\n${historyText}\n\nYour entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
             const { rawText, error } = await generateGeminiText(prompt);
             setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: rawText || "I'm still thinking..." }] }]);
             if (error) {
@@ -1212,35 +1295,53 @@ const App: React.FC = () => {
             setJobSearchSummary(prev => ({ ...prev!, schoolsChecked: i + 1 }));
     
             try {
-                const prompt = `
+                const prompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+
                     Find current job vacancies for the school named "${school.name}" located in or around "${school.location}".
                     Search their official website if available (${school.website || 'not provided'}), or search for jobs from that school online.
-                    
-                    For each vacancy found, extract the following details. Return the response as a single JSON object with a key "jobs" which is an array of job objects.
-                    Each job object should have these keys:
-                    - "jobTitle": string (e.g., "Teacher of Mathematics")
-                    - "subject": string (e.g., "Mathematics", "Science", "English")
-                    - "salary": string (e.g., "MPS/UPS", "£30,000 - £45,000")
-                    - "closeDate": string (in DD/MM/YYYY format if available)
-                    - "jobDescription": string (a brief summary of the role)
-                    - "sourceUrl": string (the direct URL to the job posting)
-    
-                    If no jobs are found, return an empty "jobs" array.
-                `;
+
+                    JSON schema:
+                    {
+                      "jobs": [
+                        {
+                          "jobTitle": "string",
+                          "subject": "string",
+                          "salary": "string",
+                          "closeDate": "DD/MM/YYYY or empty string",
+                          "jobDescription": "string",
+                          "sourceUrl": "string"
+                        }
+                      ]
+                    }
+
+                    If no jobs are found, return an empty "jobs" array and use empty strings for missing fields.
+
+                    Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
                 
-                const { data: parsedResult, error, rawText } = await generateGeminiJson<{ jobs: any[] }>(prompt, { jobs: [] });
+                const defaults = { jobs: [] };
+                const { data: parsedResult, error, rawText } = await generateGeminiJson<{ jobs: any[] }>(prompt, defaults);
+                const requiredFields: string[] = [];
+                const check = analyseAiResponse(rawText, parsedResult, requiredFields, defaults, prompt);
+                if (!check.ok) {
+                    console.error("AI DEBUG:", check.debug);
+                    addLog('-> AI response was missing required fields.');
+                    alert('AI Error: ' + check.debug.errorMessage);
+                    openDebug(check.debug);
+                    setIsJobSearching(false);
+                    return;
+                }
                 if (error) {
                     console.debug('Job search raw AI response:', rawText);
                     addLog('-> AI response was unclear; using best effort to parse jobs.');
                     alert('AI Error: ' + error);
                 }
 
-                if (parsedResult.jobs && parsedResult.jobs.length > 0) {
-                    addLog(`Found ${parsedResult.jobs.length} potential jobs for ${school.name}.`);
-                    setJobSearchSummary(prev => ({ ...prev!, found: prev!.found + parsedResult.jobs.length }));
-    
-                    for (const job of parsedResult.jobs) {
-                        const isDuplicate = existingJobs.some(existing => 
+                if (check.data.jobs && check.data.jobs.length > 0) {
+                    addLog(`Found ${check.data.jobs.length} potential jobs for ${school.name}.`);
+                    setJobSearchSummary(prev => ({ ...prev!, found: prev!.found + check.data.jobs.length }));
+
+                    for (const job of check.data.jobs) {
+                        const isDuplicate = existingJobs.some(existing =>
                             existing.schoolName.toLowerCase() === school.name.toLowerCase() &&
                             existing.jobTitle.toLowerCase() === job.jobTitle.toLowerCase()
                         );
@@ -1626,6 +1727,7 @@ const App: React.FC = () => {
                                    onSendCoachMessage={handleSendCoachMessage}
                                    isCoachResponding={isCoachResponding}
                                    onUpdateSchool={handleUpdateSchool}
+                                   openDebug={openDebug}
                                />
                            )}
                            {activeView === 'Book of Business' && (
@@ -1794,7 +1896,7 @@ const App: React.FC = () => {
                     schools={currentUserData.schools || []}
                     candidates={currentUserData.candidates || []}
                  />
-                 <AddCandidateModal 
+                 <AddCandidateModal
                     isOpen={isAddCandidateModalOpen}
                     onClose={() => setIsAddCandidateModalOpen(false)}
                     onSubmit={async (cand) => {
@@ -1808,6 +1910,12 @@ const App: React.FC = () => {
                         await loadData(false);
                     }}
                  />
+
+                <AiDebugPanel
+                    isOpen={isDebugOpen}
+                    onClose={() => setIsDebugOpen(false)}
+                    debugData={aiDebug}
+                />
 
                 <BackgroundSyncStatus tasks={backgroundTasks} onDismiss={(id) => setBackgroundTasks(prev => prev.filter(t => t.id !== id))} />
                 <JobAlertNotification notifications={jobAlertNotifications} onDismiss={(id) => setJobAlertNotifications(prev => prev.filter(n => n.excelRowIndex !== id))} />

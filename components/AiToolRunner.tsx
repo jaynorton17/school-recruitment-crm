@@ -32,9 +32,22 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
 
             const context = "Context: General check-in with a school that has been quiet recently.";
             
-            const fullPrompt = tool.prompt
+            const basePrompt = tool.prompt
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{CONTEXT}}', context);
+
+            const fullPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+
+${basePrompt}
+
+JSON schema:
+{
+  "result": "string"
+}
+
+If the tool instructions would normally return text, place it in the "result" field as a string.
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
             const { rawText, error } = await generateGeminiText(fullPrompt);
             setResult(rawText || '');

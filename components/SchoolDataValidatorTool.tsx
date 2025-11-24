@@ -3,14 +3,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import { generateGeminiJson } from '../services/gemini';
 import { School } from '../types';
 import { SpinnerIcon, CheckIcon, GlobeIcon, StopIcon, RefreshIcon } from './icons';
+import { AiDebugInfo, analyseAiResponse } from '../services/aiDebug';
 
 interface SchoolDataValidatorToolProps {
     schools: School[];
     onUpdateSchool: (updatedSchool: School) => Promise<void>;
     onBack: () => void;
+    openDebug: (debug: AiDebugInfo) => void;
 }
 
-const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schools, onUpdateSchool, onBack }) => {
+const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schools, onUpdateSchool, onBack, openDebug }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
     const [processedCount, setProcessedCount] = useState(0);
@@ -51,12 +53,35 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
             // if (school.website && school.contactNumber) continue; 
 
             try {
-                const prompt = `Find the official website URL and the main contact telephone number for the school "${school.name}" located in "${school.location}". Return a JSON object with keys: "website" (string) and "phoneNumber" (string). If not found, return empty strings.`;
+                const prompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+
+Find the official website URL and the main contact telephone number for the school "${school.name}" located in "${school.location}".
+
+JSON schema:
+{
+  "website": "string",
+  "phoneNumber": "string"
+}
+
+If data is not found, return empty strings for the missing fields.
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
                 
+                const defaults = { website: '', phoneNumber: '' };
                 const { data: result, error, rawText } = await generateGeminiJson<{ website?: string; phoneNumber?: string }>(
                     prompt,
-                    { website: '', phoneNumber: '' }
+                    defaults
                 );
+                const requiredFields = ['website', 'phoneNumber'];
+                const check = analyseAiResponse(rawText, result, requiredFields, defaults, prompt);
+                if (!check.ok) {
+                    console.error("AI DEBUG:", check.debug);
+                    addLog(`AI response missing required fields for ${school.name}.`);
+                    alert('AI Error: ' + check.debug.errorMessage);
+                    openDebug(check.debug);
+                    setIsProcessing(false);
+                    return;
+                }
                 if (error) {
                     addLog(`AI response parse issue for ${school.name}; using best effort.`);
                     alert('AI Error: ' + error);
@@ -65,16 +90,16 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
                 let needsUpdate = false;
                 const updates: string[] = [];
 
-                if (result.website && result.website !== school.website) {
-                    school.website = result.website;
+                if (check.data.website && check.data.website !== school.website) {
+                    school.website = check.data.website;
                     needsUpdate = true;
-                    updates.push(`Website: ${result.website}`);
+                    updates.push(`Website: ${check.data.website}`);
                 }
 
-                if (result.phoneNumber && result.phoneNumber !== school.contactNumber) {
-                    school.contactNumber = result.phoneNumber;
+                if (check.data.phoneNumber && check.data.phoneNumber !== school.contactNumber) {
+                    school.contactNumber = check.data.phoneNumber;
                     needsUpdate = true;
-                    updates.push(`Phone: ${result.phoneNumber}`);
+                    updates.push(`Phone: ${check.data.phoneNumber}`);
                 }
 
                 if (needsUpdate) {
