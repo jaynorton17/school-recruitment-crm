@@ -1,4 +1,5 @@
 import React from 'react';
+import AnimatedChristmasTree from '../src/components/AnimatedChristmasTree';
 
 // New sleigh SVG with a bright red color
 const SantaSleigh = () => (
@@ -453,6 +454,9 @@ const PostLoginLoading: React.FC<{ progress: number }> = ({ progress }) => {
       <div className="loading-content">
         <h1 className="text-4xl font-bold">Welcome Back!</h1>
         <p className="mt-3 text-lg text-slate-300">Getting your CRM ready for a productive day...</p>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.5rem', marginBottom: '0.75rem' }}>
+          <AnimatedChristmasTree />
+        </div>
         <div className="progress-bar">
           <div className="progress-bar-inner" style={{ width: `${progress}%` }}></div>
         </div>
