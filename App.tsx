@@ -5,6 +5,7 @@ import { msalConfig, loginRequest } from './authConfig';
 import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, addNote, addTask, addEmail, getWorksheetMap, updateTask, deleteTask, getUserEmails, updateSchool, getUserProfile, updateSpokenToCoverManagerStatus, updateNote, deleteNote, sendEmail, addOpportunity, updateOpportunity, deleteOpportunity, deleteCallLog, updateCallLog, addEmailTemplate, updateEmailTemplate, deleteEmailTemplate, clearAllEmailTemplates, addEmailTemplateAttachment, deleteEmailTemplateAttachment, updateOpportunityNotes, updateCallLogTranscript, addAnnouncement, clearAllEmailTemplateAttachments, addBooking, deleteBooking, updateBooking, updateCandidate, addCandidate, addJobAlert, deleteJobAlert } from './graph';
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
 import { generateGeminiJson, generateGeminiText } from './services/gemini';
+import { callUnifiedAI } from './services/aiRouter';
 import AiDebugPanel from './components/AiDebugPanel';
 import AIDebugPanel from './src/components/AIDebugPanel';
 import { AiDebugInfo, analyseAiResponse } from './services/aiDebug';
@@ -565,24 +566,41 @@ const App: React.FC = () => {
         Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
         try {
-            const defaults = { website: '', contactNumber: '', email: '', deputyHead: '', deputyHeadEmail: '' };
-            const modelName = "gemini-1.5-flash";
-            const { data: extracted, error, rawText } = await generateGeminiJson<{ website?: string; contactNumber?: string; email?: string; deputyHead?: string; deputyHeadEmail?: string }>(
-                prompt,
-                defaults
-            );
+            const defaults = {
+                website: '',
+                contactNumber: '',
+                email: '',
+                deputyHead: '',
+                deputyHeadEmail: ''
+            };
+
+            const { data: extracted, error, rawText } =
+                await callUnifiedAI<{
+                    website?: string;
+                    contactNumber?: string;
+                    email?: string;
+                    deputyHead?: string;
+                    deputyHeadEmail?: string;
+                }>({
+                    mode: "Utility",
+                    prompt,
+                    fallback: defaults
+                });
+
             const requiredFields = ['website', 'contactNumber', 'email', 'deputyHead', 'deputyHeadEmail'];
             const missingFields = requiredFields.filter(field => {
                 const value = (extracted as any)?.[field];
                 return value === undefined || value === null;
             });
+
             const check = analyseAiResponse(rawText, extracted, requiredFields, defaults, prompt);
+
             logAIDebugEvent({
                 id: crypto.randomUUID(),
                 toolName: 'ContactDetailsFinder',
                 timestamp: Date.now(),
                 prompt,
-                model: modelName,
+                model: "models/gemini-pro",
                 requestPayload: { prompt, responseMimeType: 'application/json' },
                 rawResponse: rawText,
                 cleanedText: rawText || '',
@@ -590,15 +608,21 @@ const App: React.FC = () => {
                 missingFields,
                 error: error || null,
                 errorStack: null,
-                location: 'App.tsx:541'
+                location: 'App.tsx:handleUpdateContactDetails'
             });
+
             if (!check.ok) {
                 console.error("AI DEBUG:", check.debug);
-                updateBackgroundTask(taskId, 'error', check.debug.errorMessage || 'AI response missing required fields.');
+                updateBackgroundTask(
+                    taskId,
+                    'error',
+                    check.debug.errorMessage || 'AI response missing required fields.'
+                );
                 alert('AI Error: ' + check.debug.errorMessage);
                 openDebug(check.debug);
                 return;
             }
+
             if (error) {
                 console.debug('Contact update raw AI response:', rawText);
                 alert('AI Error: ' + error);
@@ -641,7 +665,7 @@ const App: React.FC = () => {
                 toolName: 'ContactDetailsFinder',
                 timestamp: Date.now(),
                 prompt,
-                model: 'gemini-1.5-flash',
+                model: 'models/gemini-pro',
                 requestPayload: { prompt, responseMimeType: 'application/json' },
                 rawResponse: null,
                 cleanedText: '',
@@ -649,7 +673,7 @@ const App: React.FC = () => {
                 missingFields: ['website', 'contactNumber', 'email', 'deputyHead', 'deputyHeadEmail'],
                 error: e?.message || 'Unknown error',
                 errorStack: e?.stack ?? null,
-                location: 'App.tsx:585'
+                location: 'App.tsx:handleUpdateContactDetails'
             });
             alert("AI Error: " + (e?.message || 'Could not fetch contact details.'));
             updateBackgroundTask(taskId, 'error', 'AI failed to find contact details.');
@@ -967,7 +991,11 @@ const App: React.FC = () => {
             };
             const fullPrompt = coachPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
             const defaultReport = { kpis: {}, keyInsights: [], strengths: [], weaknesses: [], recommendedActions: [] };
-            const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultReport);
+            const { data: report, error, rawText } = await callUnifiedAI<any>({
+                mode: "Coach",
+                prompt: fullPrompt,
+                fallback: defaultReport
+            });
             const requiredFields = ['kpis', 'keyInsights', 'strengths', 'weaknesses', 'recommendedActions'];
             const check = analyseAiResponse(rawText, report, requiredFields, defaultReport, fullPrompt);
             if (!check.ok) {
@@ -1181,7 +1209,11 @@ const App: React.FC = () => {
 
         try {
             const defaults = { notes: "", tasks: [], email: {} };
-            const { data: parsed, rawText, error } = await generateGeminiJson<any>(prompt, defaults);
+            const { data: parsed, rawText, error } = await callUnifiedAI<any>({
+                mode: "Transcriber",
+                prompt,
+                fallback: defaults
+            });
 
             const requiredFields = ['notes', 'tasks', 'email'];
             const check = analyseAiResponse(rawText, parsed, requiredFields, defaults, prompt);
@@ -1373,7 +1405,12 @@ const App: React.FC = () => {
                     Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
                 
                 const defaults = { jobs: [] };
-                const { data: parsedResult, error, rawText } = await generateGeminiJson<{ jobs: any[] }>(prompt, defaults);
+                const { data: parsedResult, error, rawText } =
+                    await callUnifiedAI<{ jobs: any[] }>({
+                        mode: "Alerts",
+                        prompt,
+                        fallback: defaults
+                    });
                 const requiredFields: string[] = [];
                 const check = analyseAiResponse(rawText, parsedResult, requiredFields, defaults, prompt);
                 if (!check.ok) {
