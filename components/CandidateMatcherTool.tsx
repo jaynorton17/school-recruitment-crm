@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { generateGeminiJson } from '../services/gemini';
 import { CrmData, School, Candidate, JobAlert } from '../types';
 import { SpinnerIcon, SearchIcon, UsersIcon, SchoolIcon, JobAlertsIcon } from './icons';
+import { AiDebugInfo, analyseAiResponse } from '../services/aiDebug';
 
 interface CandidateMatcherToolProps {
     tool: { id: string; name: string; icon: React.ElementType; };
@@ -9,6 +10,7 @@ interface CandidateMatcherToolProps {
     onBack: () => void;
     onSelectSchool: (school: School) => void;
     onSelectCandidate: (candidate: Candidate) => void;
+    openDebug: (debug: AiDebugInfo) => void;
 }
 
 interface CandidateMatch { candidateName: string; reason: string; likelihood: number; }
@@ -20,29 +22,38 @@ interface MatchResults {
     jobMatches: JobMatch[];
 }
 
-const matcherPrompt = `You are the CANDIDATE, SCHOOL, & JOB MATCHER AI.
+const matcherPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+You are the CANDIDATE, SCHOOL, & JOB MATCHER AI.
 Your task is to find the best matches from the CRM data based on a user's query.
 
 The user is searching for: "{{SEARCH_QUERY}}"
 
-Analyze the CRM dataset provided. Return a single JSON object with three keys: "candidateMatches", "schoolMatches", and "jobMatches".
+JSON schema:
+{
+  "candidateMatches": [
+    { "candidateName": "string", "reason": "string", "likelihood": "number" }
+  ],
+  "schoolMatches": [
+    { "schoolName": "string", "reason": "string", "likelihood": "number" }
+  ],
+  "jobMatches": [
+    { "jobTitle": "string", "schoolName": "string", "reason": "string", "likelihood": "number" }
+  ]
+}
 
 1. For "candidateMatches" (find candidates for jobs):
    - Find up to 5 best candidates from the 'candidates' data.
-   - For each match, provide: { candidateName: string, reason: string, likelihood: number (0-100) }
-
 2. For "schoolMatches" (find schools for prospecting):
    - Find up to 5 best schools from the 'schools' data that are good prospects based on the query.
-   - For each match, provide: { schoolName: string, reason: string, likelihood: number (0-100) }
-
 3. For "jobMatches" (find jobs for candidates):
    - Find up to 5 best jobs from the 'jobAlerts' data.
-   - For each match, provide: { jobTitle: string, schoolName: string, reason: string, likelihood: number (0-100) }
 
-If a category has no matches, return an empty array for that key.
+If a category has no matches, return an empty array for that key. Use empty strings for missing text fields and 0 for missing likelihood values.
 
 CRM Dataset:
-{{CRM_DATASET}}`;
+{{CRM_DATASET}}
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
 const MatchColumn: React.FC<{
     title: string;
@@ -66,7 +77,7 @@ const MatchColumn: React.FC<{
 );
 
 
-const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmData, onBack, onSelectSchool, onSelectCandidate }) => {
+const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmData, onBack, onSelectSchool, onSelectCandidate, openDebug }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [results, setResults] = useState<MatchResults | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -90,19 +101,30 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
                 .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary))
                 .replace('{{SEARCH_QUERY}}', searchQuery);
 
+            const defaultResults = { candidateMatches: [], schoolMatches: [], jobMatches: [] };
             const { data: result, error, rawText } = await generateGeminiJson<{ candidateMatches: any[]; schoolMatches: any[]; jobMatches: any[] }>(
                 fullPrompt,
-                { candidateMatches: [], schoolMatches: [], jobMatches: [] }
+                defaultResults
             );
+            const requiredFields = ['candidateMatches', 'schoolMatches', 'jobMatches'];
+            const check = analyseAiResponse(rawText, result, requiredFields, defaultResults, fullPrompt);
+            if (!check.ok) {
+                console.error("AI DEBUG:", check.debug);
+                setError('AI response was missing required fields.');
+                alert('AI Error: ' + check.debug.errorMessage);
+                onBack();
+                openDebug(check.debug);
+                return;
+            }
             if (error) {
                 setError("AI response looked off; showing best available matches.");
                 alert('AI Error: ' + error);
             }
             console.debug('Candidate matcher raw AI response:', rawText);
             setResults({
-                candidateMatches: result.candidateMatches || [],
-                schoolMatches: result.schoolMatches || [],
-                jobMatches: result.jobMatches || [],
+                candidateMatches: check.data.candidateMatches || [],
+                schoolMatches: check.data.schoolMatches || [],
+                jobMatches: check.data.jobMatches || [],
             });
 
         } catch (e) {

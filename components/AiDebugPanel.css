@@ -1,0 +1,32 @@
+.ai-debug-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.55);
+  z-index: 999999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ai-debug-modal {
+  background: #ffffff;
+  width: 70%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 12px;
+  font-family: monospace;
+  box-shadow: 0 0 30px rgba(0,0,0,0.35);
+}
+
+.ai-debug-close {
+  margin-top: 20px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}

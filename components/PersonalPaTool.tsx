@@ -2,25 +2,41 @@ import React, { useState, useEffect } from 'react';
 import { generateGeminiJson } from '../services/gemini';
 import { CrmData, SuggestedCallList, CustomDialerList } from '../types';
 import { SpinnerIcon, PersonalPaIcon, EditIcon } from './icons';
+import { AiDebugInfo, analyseAiResponse } from '../services/aiDebug';
 
 interface PersonalPaToolProps {
     tool: { id: string; name: string; icon: React.ElementType; };
     crmData: CrmData;
     onBack: () => void;
     onSaveCustomDialerList: (listData: Omit<CustomDialerList, 'id'>) => void;
+    openDebug: (debug: AiDebugInfo) => void;
 }
 
-const personalPaPrompt = `You are the PERSONAL PA AI. Your task is to analyze the provided CRM data and generate a daily briefing for a school recruiter.
+const personalPaPrompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
 
-Return a single JSON object with two keys: "briefing" and "suggestedCallList".
+You are the PERSONAL PA AI. Your task is to analyze the provided CRM data and generate a daily briefing for a school recruiter.
+
+JSON schema:
+{
+  "briefing": "string",
+  "suggestedCallList": {
+    "name": "string",
+    "reason": "string",
+    "filters": "object"
+  }
+}
+
 - "briefing": A markdown-formatted string. It MUST include a section titled "### Top 5 High-Impact Actions". Also include sections for Overdue Tasks, Today's Priorities, and Opportunities to watch.
 - "suggestedCallList": A single object with "name", "reason", and a complete "filters" object for creating a proactive call list in the dialer.
+- If any value is unavailable, return an empty string or an empty object while keeping schema keys present.
 
 CRM Dataset:
-{{CRM_DATASET}}`;
+{{CRM_DATASET}}
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
 
-const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, onSaveCustomDialerList }) => {
+const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, onSaveCustomDialerList, openDebug }) => {
     const [briefingText, setBriefingText] = useState<string | null>(null);
     const [suggestedList, setSuggestedList] = useState<SuggestedCallList | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -61,21 +77,32 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
 
             const fullPrompt = personalPaPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
-            const { data: result, error, rawText } = await generateGeminiJson<any>(fullPrompt, {});
+            const defaultResult = { briefing: '', suggestedCallList: {} };
+            const { data: result, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultResult);
+            const requiredFields = ['briefing', 'suggestedCallList'];
+            const check = analyseAiResponse(rawText, result, requiredFields, defaultResult, fullPrompt);
+            if (!check.ok) {
+                console.error("AI DEBUG:", check.debug);
+                setError('AI response was missing required fields.');
+                alert('AI Error: ' + check.debug.errorMessage);
+                openDebug(check.debug);
+                setIsLoading(false);
+                return;
+            }
             if (error) {
                 setError('AI output looked unusual. Showing best-effort plan.');
                 alert('AI Error: ' + error);
             }
             console.debug('Personal PA raw AI response:', rawText);
 
-            if (result.briefing) {
-                setBriefingText(result.briefing);
+            if (check.data.briefing) {
+                setBriefingText(check.data.briefing);
             }
-             if (result.suggestedCallList) {
-                setSuggestedList(result.suggestedCallList);
+             if (check.data.suggestedCallList) {
+                setSuggestedList(check.data.suggestedCallList);
             }
 
-            localStorage.setItem('personalPa_dailyBriefing', JSON.stringify(result));
+            localStorage.setItem('personalPa_dailyBriefing', JSON.stringify(check.data));
             localStorage.setItem('personalPa_generationDate', new Date().toISOString().split('T')[0]); // Store just the date
 
         } catch (e) {

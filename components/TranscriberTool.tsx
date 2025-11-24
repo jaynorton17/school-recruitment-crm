@@ -80,7 +80,18 @@ const TranscriberTool: React.FC<TranscriberToolProps> = ({ crmData, onBack, onUp
         
         const updatePromises = callsToProcess.map(async (call) => {
             try {
-                const prompt = `Based on the following call transcript, generate a concise summary of 1-3 sentences to be used as call notes. Transcript: "${call.transcript}"`;
+                const prompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+
+Based on the following call transcript, generate a concise summary of 1-3 sentences to be used as call notes.
+
+JSON schema:
+{
+  "notes": "string"
+}
+
+Transcript: "${call.transcript}"
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
                 const { rawText, error } = await generateGeminiText(prompt);
                 const aiNotes = rawText;
 

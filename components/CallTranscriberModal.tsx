@@ -107,7 +107,18 @@ const AddCallLogModal: React.FC<AddCallLogModalProps> = ({ isOpen, onClose, onSu
         try {
             if (file.type.startsWith('audio/')) {
                 const audioBytes = await fileToBase64(file);
-                const prompt = `Transcribe this audio of a phone call for a school recruitment CRM. The audio is base64 encoded with mime type ${file.type}: ${audioBytes}`;
+                const prompt = `Return ONLY a single JSON object. Do not include explanations, markdown, code fences or commentary. Output must be valid JSON only.
+
+Transcribe this audio of a phone call for a school recruitment CRM. The audio is base64 encoded with mime type ${file.type}: ${audioBytes}
+
+JSON schema:
+{
+  "transcript": "string"
+}
+
+Return an empty string for transcript if speech cannot be detected.
+
+Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
                 const { rawText, error } = await generateGeminiText(prompt);
 
