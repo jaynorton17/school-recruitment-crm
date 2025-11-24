@@ -96,6 +96,7 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
             );
             if (error) {
                 setError("AI response looked off; showing best available matches.");
+                alert('AI Error: ' + error);
             }
             console.debug('Candidate matcher raw AI response:', rawText);
             setResults({
@@ -106,6 +107,7 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
 
         } catch (e) {
             console.error("Failed to generate AI matches:", e);
+            alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to find matches.'));
             setError("Sorry, the AI couldn't find matches. Please try a different query.");
         } finally {
             setIsLoading(false);

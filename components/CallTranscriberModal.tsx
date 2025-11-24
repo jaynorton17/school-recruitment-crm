@@ -120,6 +120,7 @@ const AddCallLogModal: React.FC<AddCallLogModalProps> = ({ isOpen, onClose, onSu
 
                 if (error) {
                     setEditableTranscript(prev => `${prev}\n(Note: AI transcription may be incomplete.)`);
+                    alert('AI Error: ' + error);
                 }
             } else if (file.type === 'text/plain') {
                 const reader = new FileReader();
@@ -137,6 +138,7 @@ const AddCallLogModal: React.FC<AddCallLogModalProps> = ({ isOpen, onClose, onSu
             }
         } catch (error) {
             console.error("Transcription/upload failed:", error);
+            alert('AI Error: ' + (error instanceof Error ? error.message : 'Transcription failed.'));
             setEditableTranscript("An error occurred during transcription. Please try again.");
         } finally {
             setIsTranscribing(false);

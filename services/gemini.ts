@@ -2,141 +2,65 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export interface GeminiTextResult {
   rawText: string;
-  error?: string;
+  error: string | null;
 }
 
-export interface GeminiJsonResult<T extends object> extends GeminiTextResult {
+export interface GeminiJsonResult<T> extends GeminiTextResult {
   data: T;
 }
 
-let cachedApiKey: string | null = null;
-
-const fetchApiKeyFromBackend = async (): Promise<string | null> => {
-  if (typeof fetch !== "function") return null;
-
-  try {
-    const response = await fetch("/api/gemini-api-key");
-    if (!response.ok) return null;
-    const payload = await response.json().catch(() => null);
-    return payload?.apiKey || null;
-  } catch (error) {
-    console.warn("Falling back to environment Gemini API key; backend fetch failed.", error);
-    return null;
-  }
-};
-
-const getApiKey = async (): Promise<string> => {
-  if (cachedApiKey) return cachedApiKey;
-
-  const backendKey = await fetchApiKeyFromBackend();
-  if (backendKey) {
-    cachedApiKey = backendKey;
-    return backendKey;
-  }
-
+export async function getGeminiModel(modelName: string) {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
   if (!apiKey) {
-    throw new Error("Gemini API key is not available from the backend or environment.");
+    throw new Error("Gemini API key is not configured. Set VITE_GEMINI_API_KEY.");
   }
 
-  cachedApiKey = apiKey;
-  return apiKey;
+  const genAI = new GoogleGenerativeAI(apiKey);
+  return genAI.getGenerativeModel({ model: modelName });
+}
+
+const cleanJsonText = (rawText: string) => {
+  let cleaned = (rawText || "").trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/```json|```/g, "").trim();
+  }
+  return cleaned;
 };
 
-export const getGeminiModel = async (model: string) => {
-  const genAI = new GoogleGenerativeAI(await getApiKey());
-  return genAI.getGenerativeModel({ model });
-};
-
-export const safeExtractGeminiJson = <T extends object>(rawText: string, fallback: T): { data: T; error?: string } => {
-  const cleanedText = (rawText || "").trim();
-  if (!cleanedText) {
-    return { data: fallback, error: "Gemini returned an empty response." };
-  }
-
-  const codeBlockMatch = cleanedText.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidates = [codeBlockMatch ? codeBlockMatch[1] : cleanedText];
-
-  const braceMatch = cleanedText.match(/\{[\s\S]*\}/);
-  if (braceMatch) {
-    candidates.push(braceMatch[0]);
-  }
-
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && typeof parsed === "object") {
-        return { data: parsed as T };
-      }
-    } catch {
-      continue;
-    }
-  }
-
-  return { data: fallback, error: "Failed to parse Gemini JSON response." };
-};
-
-export const generateGeminiText = async (prompt: string, modelName = "gemini-1.5-flash"): Promise<GeminiTextResult> => {
+export async function generateGeminiJson<T>(prompt: string, fallback: T, modelName = "gemini-1.5-flash"): Promise<GeminiJsonResult<T>> {
   try {
     const model = await getGeminiModel(modelName);
     const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      ],
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json" },
     });
 
-    const rawText = result.response.text();
-    console.debug("Gemini raw response:", rawText);
-    return { rawText };
-  } catch (error) {
-    console.error("Gemini call failed:", error);
-    return { rawText: "", error: error instanceof Error ? error.message : "Unknown Gemini error" };
-  }
-};
-
-export const generateGeminiJson = async <T extends object>(
-  prompt: string,
-  fallback: T,
-  modelName = "gemini-1.5-flash"
-): Promise<GeminiJsonResult<T>> => {
-  try {
-    const model = await getGeminiModel(modelName);
-    const result = await model.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      ],
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const rawText = result.response.text().trim();
-    console.debug("Gemini raw response:", rawText);
+    let rawText = result.response.text() || "";
+    rawText = cleanJsonText(rawText);
 
     if (!rawText) {
-      return { rawText, data: fallback, error: "Gemini returned an empty response." };
+      return { data: fallback, rawText: "", error: "Gemini returned an empty response." };
     }
 
     try {
       const parsed = JSON.parse(rawText) as T;
-      return { rawText, data: parsed };
+      return { data: parsed, rawText, error: null };
     } catch (parseError) {
-      const { data, error } = safeExtractGeminiJson<T>(rawText, fallback);
-      return {
-        rawText,
-        data,
-        error: error ?? `Failed to parse Gemini JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`,
-      };
+      const message = parseError instanceof Error ? parseError.message : "Unknown parse error";
+      return { data: fallback, rawText, error: `Failed to parse Gemini JSON response: ${message}` };
     }
   } catch (error) {
-    console.error("Gemini call failed:", error);
-    return { rawText: "", data: fallback, error: error instanceof Error ? error.message : "Unknown Gemini error" };
+    return { data: fallback, rawText: "", error: error instanceof Error ? error.message : "Unknown Gemini error" };
   }
-};
+}
+
+export async function generateGeminiText(prompt: string, modelName = "gemini-1.5-flash"): Promise<GeminiTextResult> {
+  try {
+    const model = await getGeminiModel(modelName);
+    const result = await model.generateContent({ contents: [{ role: "user", parts: [{ text: prompt }] }] });
+    const rawText = (result.response.text() || "").trim();
+    return { rawText, error: null };
+  } catch (error) {
+    return { rawText: "", error: error instanceof Error ? error.message : "Unknown Gemini error" };
+  }
+}

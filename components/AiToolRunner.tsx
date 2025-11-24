@@ -40,10 +40,12 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
             setResult(rawText || '');
             if (error) {
                 setError('Sorry, the AI is having a moment. Please try again later.');
+                alert('AI Error: ' + error);
             }
 
         } catch (e) {
             console.error(`Failed to generate AI result for ${tool.name}:`, e);
+            alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to run AI tool.'));
             setError(`Sorry, the AI is having a moment. Please try again later.`);
         } finally {
             setIsLoading(false);

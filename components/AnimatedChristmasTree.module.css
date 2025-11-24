@@ -1,0 +1,46 @@
+.treeWrapper {
+  position: relative;
+  width: 140px;
+  height: 180px;
+}
+
+.treeSvg {
+  width: 100%;
+  height: 100%;
+}
+
+.branch {
+  fill: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+}
+
+.trunk {
+  fill: #8b5a2b;
+}
+
+.star {
+  fill: #facc15;
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.8));
+  animation: glow 1.8s ease-in-out infinite;
+}
+
+.light {
+  fill: #fef9c3;
+  stroke: rgba(0, 0, 0, 0.08);
+  stroke-width: 1;
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.red { fill: #f43f5e; }
+.blue { fill: #38bdf8; }
+.green { fill: #22c55e; }
+.gold { fill: #f59e0b; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.9); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes glow {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}

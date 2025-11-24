@@ -59,6 +59,7 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
                 );
                 if (error) {
                     addLog(`AI response parse issue for ${school.name}; using best effort.`);
+                    alert('AI Error: ' + error);
                 }
                 console.debug('Validator raw AI response:', rawText);
                 let needsUpdate = false;
@@ -86,6 +87,7 @@ const SchoolDataValidatorTool: React.FC<SchoolDataValidatorToolProps> = ({ schoo
 
             } catch (e) {
                 console.error(`Error processing ${school.name}:`, e);
+                alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to validate school.'));
                 addLog(`Error processing ${school.name}.`);
             }
             

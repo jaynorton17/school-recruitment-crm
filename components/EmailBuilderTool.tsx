@@ -64,14 +64,23 @@ const EmailBuilderTool: React.FC<EmailBuilderToolProps> = ({ tool, crmData, onBa
                         .replace('{{CONTEXT}}', context)
                         .replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
-                    const { data: result, error, rawText } = await generateGeminiJson<any>(populatedPrompt, {});
-                    setGeneratedContent(result);
+                    const defaultContent: GeneratedContent = { email: '', sms: '', subjects: [], followup: '' };
+                    const { data: result, error, rawText } = await generateGeminiJson<GeneratedContent>(populatedPrompt, defaultContent);
+                    const safeResult: GeneratedContent = {
+                        email: typeof result.email === 'string' ? result.email : '',
+                        sms: typeof result.sms === 'string' ? result.sms : '',
+                        subjects: Array.isArray(result.subjects) ? result.subjects.filter((s): s is string => typeof s === 'string') : [],
+                        followup: typeof result.followup === 'string' ? result.followup : '',
+                    };
+                    setGeneratedContent(safeResult);
                     if (error) {
                         console.debug('Email builder raw AI response:', rawText);
                         setError('AI output looked unusual. Please review before sending.');
+                        alert('AI Error: ' + error);
                     }
                 } catch (e) {
                     console.error("Failed to generate email content:", e);
+                    alert('AI Error: ' + (e instanceof Error ? e.message : 'Failed to generate content.'));
                     setError("Failed to generate content. Please try again.");
                     setGeneratedContent(null);
                 } finally {
