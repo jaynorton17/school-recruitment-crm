@@ -549,8 +549,7 @@ const App: React.FC = () => {
             const defaults = { website: '', contactNumber: '', email: '', deputyHead: '', deputyHeadEmail: '' };
             const { data: extracted, error, rawText } = await generateGeminiJson<{ website?: string; contactNumber?: string; email?: string; deputyHead?: string; deputyHeadEmail?: string }>(
                 prompt,
-                defaults,
-                "gemini-1.5-flash"
+                defaults
             );
             const requiredFields = ['website', 'contactNumber', 'email', 'deputyHead', 'deputyHeadEmail'];
             const check = analyseAiResponse(rawText, extracted, requiredFields, defaults, prompt);
@@ -914,7 +913,7 @@ const App: React.FC = () => {
             };
             const fullPrompt = coachPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
             const defaultReport = { kpis: {}, keyInsights: [], strengths: [], weaknesses: [], recommendedActions: [] };
-            const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultReport, "gemini-1.5-flash");
+            const { data: report, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultReport);
             const requiredFields = ['kpis', 'keyInsights', 'strengths', 'weaknesses', 'recommendedActions'];
             const check = analyseAiResponse(rawText, report, requiredFields, defaultReport, fullPrompt);
             if (!check.ok) {
@@ -1128,7 +1127,7 @@ const App: React.FC = () => {
 
         try {
             const defaults = { notes: "", tasks: [], email: {} };
-            const { data: parsed, rawText, error } = await generateGeminiJson<any>(prompt, defaults, "gemini-1.5-flash");
+            const { data: parsed, rawText, error } = await generateGeminiJson<any>(prompt, defaults);
 
             const requiredFields = ['notes', 'tasks', 'email'];
             const check = analyseAiResponse(rawText, parsed, requiredFields, defaults, prompt);
@@ -1246,7 +1245,7 @@ const App: React.FC = () => {
                  .map(entry => `${entry.role === 'user' ? 'User' : 'Coach'}: ${entry.parts[0].text}`)
                  .join('\n');
             const prompt = `${systemInstruction}\n\nYou are an AI sales coach for a recruiter. Your goal is to help them improve performance based on their KPI report: ${context}. Be encouraging but direct. Respond to the latest user message as structured JSON.\n\nJSON schema:\n{\n  "message": "string"\n}\n\nConversation so far:\n${historyText}\n\nYour entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
-            const { rawText, error } = await generateGeminiText(prompt, "gemini-1.5-flash");
+            const { rawText, error } = await generateGeminiText(prompt);
             setCoachChatHistory(prev => [...prev, { role: 'model' as const, parts: [{ text: rawText || "I'm still thinking..." }] }]);
             if (error) {
                 console.debug('Coach chat raw AI response:', rawText);
@@ -1320,7 +1319,7 @@ const App: React.FC = () => {
                     Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
                 
                 const defaults = { jobs: [] };
-                const { data: parsedResult, error, rawText } = await generateGeminiJson<{ jobs: any[] }>(prompt, defaults, "gemini-1.5-flash");
+                const { data: parsedResult, error, rawText } = await generateGeminiJson<{ jobs: any[] }>(prompt, defaults);
                 const requiredFields: string[] = [];
                 const check = analyseAiResponse(rawText, parsedResult, requiredFields, defaults, prompt);
                 if (!check.ok) {

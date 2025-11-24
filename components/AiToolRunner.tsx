@@ -49,7 +49,7 @@ If the tool instructions would normally return text, place it in the "result" fi
 
 Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
-            const { rawText, error } = await generateGeminiText(fullPrompt, "gemini-1.5-flash");
+            const { rawText, error } = await generateGeminiText(fullPrompt);
             setResult(rawText || '');
             if (error) {
                 setError('Sorry, the AI is having a moment. Please try again later.');

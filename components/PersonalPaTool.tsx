@@ -78,7 +78,7 @@ const PersonalPaTool: React.FC<PersonalPaToolProps> = ({ tool, crmData, onBack, 
             const fullPrompt = personalPaPrompt.replace('{{CRM_DATASET}}', JSON.stringify(dataSummary));
 
             const defaultResult = { briefing: '', suggestedCallList: {} };
-            const { data: result, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultResult, "gemini-1.5-flash");
+            const { data: result, error, rawText } = await generateGeminiJson<any>(fullPrompt, defaultResult);
             const requiredFields = ['briefing', 'suggestedCallList'];
             const check = analyseAiResponse(rawText, result, requiredFields, defaultResult, fullPrompt);
             if (!check.ok) {

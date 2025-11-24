@@ -104,8 +104,7 @@ const CandidateMatcherTool: React.FC<CandidateMatcherToolProps> = ({ tool, crmDa
             const defaultResults = { candidateMatches: [], schoolMatches: [], jobMatches: [] };
             const { data: result, error, rawText } = await generateGeminiJson<{ candidateMatches: any[]; schoolMatches: any[]; jobMatches: any[] }>(
                 fullPrompt,
-                defaultResults,
-                "gemini-1.5-flash"
+                defaultResults
             );
             const requiredFields = ['candidateMatches', 'schoolMatches', 'jobMatches'];
             const check = analyseAiResponse(rawText, result, requiredFields, defaultResults, fullPrompt);
