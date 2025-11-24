@@ -1,3 +1,5 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
 export interface GeminiTextResult {
   rawText: string;
   error: string | null;
@@ -9,13 +11,11 @@ export interface GeminiJsonResult<T> extends GeminiTextResult {
 
 export function extractGeminiText(response: any): string {
   try {
-    // New Gemini 1.5 format
     const parts = response?.candidates?.[0]?.content?.parts;
     if (Array.isArray(parts) && parts[0]?.text) {
       return parts[0].text;
     }
 
-    // Older fallback
     if (typeof response.text === "function") {
       return response.text();
     }
@@ -27,7 +27,6 @@ export function extractGeminiText(response: any): string {
 }
 
 function getGeminiApiKey(): string {
-  // Support both Vite (browser build) and direct Node execution (scripts).
   const runtimeEnv = typeof process !== "undefined" ? (process as any).env : undefined;
   const key = import.meta?.env?.VITE_GEMINI_API_KEY ?? runtimeEnv?.VITE_GEMINI_API_KEY;
   if (!key) {
@@ -36,25 +35,22 @@ function getGeminiApiKey(): string {
   return key;
 }
 
-async function callGeminiGenerateContent(modelName: string, body: Record<string, any>) {
-  const apiKey = getGeminiApiKey();
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    }
-  );
+let genAI: GoogleGenerativeAI | null = null;
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => "");
-    throw new Error(
-      `Gemini API request failed (${response.status} ${response.statusText}). ${errorText || "No response body."}`
-    );
+function getGenerativeModel(modelName: string) {
+  if (!genAI) {
+    genAI = new GoogleGenerativeAI(getGeminiApiKey());
   }
+  return genAI.getGenerativeModel({ model: modelName });
+}
 
-  return response.json();
+async function callGeminiGenerateContent(modelName: string, prompt: string, generationConfig?: Record<string, any>) {
+  const model = getGenerativeModel(modelName);
+  const response = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    ...(generationConfig ? { generationConfig } : {})
+  });
+  return response.response;
 }
 
 const cleanJsonText = (rawText: string) => {
@@ -71,10 +67,7 @@ export async function generateGeminiJson<T>(
   modelName = "gemini-1.5-flash"
 ): Promise<GeminiJsonResult<T>> {
   try {
-    const result = await callGeminiGenerateContent(modelName, {
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json" }
-    });
+    const result = await callGeminiGenerateContent(modelName, prompt, { responseMimeType: "application/json" });
 
     let rawText = extractGeminiText(result);
     rawText = cleanJsonText(rawText);
@@ -109,9 +102,7 @@ export async function generateGeminiText(
   modelName = "gemini-1.5-flash"
 ): Promise<GeminiTextResult> {
   try {
-    const result = await callGeminiGenerateContent(modelName, {
-      contents: [{ role: "user", parts: [{ text: prompt }] }]
-    });
+    const result = await callGeminiGenerateContent(modelName, prompt);
 
     const rawText = extractGeminiText(result)?.trim() ?? "";
     return { rawText, error: null };

@@ -70,7 +70,8 @@ Your entire response MUST be ONLY a valid JSON object that matches the schema. N
                 const defaults = { website: '', phoneNumber: '' };
                 const { data: result, error, rawText } = await generateGeminiJson<{ website?: string; phoneNumber?: string }>(
                     prompt,
-                    defaults
+                    defaults,
+                    "gemini-1.5-flash"
                 );
                 const requiredFields = ['website', 'phoneNumber'];
                 const check = analyseAiResponse(rawText, result, requiredFields, defaults, prompt);
