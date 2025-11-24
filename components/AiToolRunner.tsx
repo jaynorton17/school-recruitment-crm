@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { generateGeminiText } from '../services/gemini';
+import { addAIDebugEvent } from '../src/debug/aiDebug';
 import { CrmData } from '../types';
 import { SpinnerIcon } from './icons';
 
@@ -19,6 +20,11 @@ const AiToolRunner: React.FC<AiToolRunnerProps> = ({ tool, crmData, onBack }) =>
         setIsLoading(true);
         setError(null);
         setResult('');
+        const modelName = "gemini-1.5-flash";
+        const envVars = {
+            ...(typeof process !== 'undefined' ? (process as any).env ?? {} : {}),
+            ...((import.meta as any)?.env ?? {})
+        };
 
         try {
             const dataSummary = {
@@ -49,7 +55,23 @@ If the tool instructions would normally return text, place it in the "result" fi
 
 Your entire response MUST be ONLY a valid JSON object that matches the schema. No prose. No markdown. No prefixes. No suffixes.`;
 
-            const { rawText, error } = await generateGeminiText(fullPrompt, "gemini-1.5-flash");
+            const { rawText, error } = await generateGeminiText(fullPrompt, modelName);
+            addAIDebugEvent({
+                id: crypto.randomUUID(),
+                toolName: tool.name,
+                timestamp: Date.now(),
+                prompt: fullPrompt,
+                model: modelName,
+                requestPayload: { prompt: fullPrompt },
+                rawResponse: rawText,
+                cleanedText: rawText || '',
+                parsedJson: null,
+                missingFields: [],
+                error: error || null,
+                errorStack: null,
+                location: "components/AiToolRunner.tsx:44",
+                environment: { envVars }
+            });
             setResult(rawText || '');
             if (error) {
                 setError('Sorry, the AI is having a moment. Please try again later.');
@@ -58,6 +80,22 @@ Your entire response MUST be ONLY a valid JSON object that matches the schema. N
 
         } catch (e) {
             console.error(`Failed to generate AI result for ${tool.name}:`, e);
+            addAIDebugEvent({
+                id: crypto.randomUUID(),
+                toolName: tool.name,
+                timestamp: Date.now(),
+                prompt: '',
+                model: modelName,
+                requestPayload: {},
+                rawResponse: null,
+                cleanedText: '',
+                parsedJson: null,
+                missingFields: [],
+                error: e instanceof Error ? e.message : 'Unknown error',
+                errorStack: e instanceof Error ? e.stack ?? null : null,
+                location: "components/AiToolRunner.tsx:65",
+                environment: { envVars }
+            });
             alert('AI Error: ' + (e instanceof Error ? e.message : 'Unable to run AI tool.'));
             setError(`Sorry, the AI is having a moment. Please try again later.`);
         } finally {

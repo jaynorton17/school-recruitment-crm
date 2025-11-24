@@ -6,7 +6,10 @@ import { getAccessToken, getWorkbookPath, getAllCRMData, addSchool, addCallLog, 
 import { parseSchools, parseTasks, parseNotes, parseEmails, parseCallLogs, parseUsers, formatDateUK, parseSyncedEmails, parseUKDate, parseUKDateTime, parseCandidates, parseOpportunities, parseUKDateTimeString, formatDateTimeUK, parseEmailTemplates, parseEmailTemplateAttachments, resilientWrite, parseAnnouncements, parseBookings, getExcelSerialDate, parseJobAlerts, formatTime, formatDateTimeUS_Excel } from './utils';
 import { generateGeminiJson, generateGeminiText } from './services/gemini';
 import AiDebugPanel from './components/AiDebugPanel';
+import AIDebugPanel from './src/components/AIDebugPanel';
 import { AiDebugInfo, analyseAiResponse } from './services/aiDebug';
+import { addAIDebugEvent } from './src/debug/aiDebug';
+import type { AIDebugEvent } from './src/debug/aiDebug';
 
 
 import Sidebar from './components/Sidebar';
@@ -203,6 +206,22 @@ const App: React.FC = () => {
     const openDebug = (debug: AiDebugInfo) => {
         setAiDebug(debug);
         setIsDebugOpen(true);
+    };
+
+    const getEnvVars = () => ({
+        ...(typeof process !== 'undefined' ? (process as any).env ?? {} : {}),
+        ...((import.meta as any)?.env ?? {})
+    });
+
+    const logAIDebugEvent = (event: Omit<AIDebugEvent, 'environment'> & { environment?: { envVars: any } }) => {
+        try {
+            addAIDebugEvent({
+                ...event,
+                environment: event.environment ?? { envVars: getEnvVars() }
+            });
+        } catch (err) {
+            console.warn('Failed to log AI debug event', err);
+        }
     };
 
 
@@ -547,13 +566,33 @@ const App: React.FC = () => {
 
         try {
             const defaults = { website: '', contactNumber: '', email: '', deputyHead: '', deputyHeadEmail: '' };
+            const modelName = "gemini-1.5-flash";
             const { data: extracted, error, rawText } = await generateGeminiJson<{ website?: string; contactNumber?: string; email?: string; deputyHead?: string; deputyHeadEmail?: string }>(
                 prompt,
                 defaults,
-                "gemini-1.5-flash"
+                modelName
             );
             const requiredFields = ['website', 'contactNumber', 'email', 'deputyHead', 'deputyHeadEmail'];
+            const missingFields = requiredFields.filter(field => {
+                const value = (extracted as any)?.[field];
+                return value === undefined || value === null;
+            });
             const check = analyseAiResponse(rawText, extracted, requiredFields, defaults, prompt);
+            logAIDebugEvent({
+                id: crypto.randomUUID(),
+                toolName: 'ContactDetailsFinder',
+                timestamp: Date.now(),
+                prompt,
+                model: modelName,
+                requestPayload: { prompt, responseMimeType: 'application/json' },
+                rawResponse: rawText,
+                cleanedText: rawText || '',
+                parsedJson: extracted,
+                missingFields,
+                error: error || null,
+                errorStack: null,
+                location: 'App.tsx:541'
+            });
             if (!check.ok) {
                 console.error("AI DEBUG:", check.debug);
                 updateBackgroundTask(taskId, 'error', check.debug.errorMessage || 'AI response missing required fields.');
@@ -598,6 +637,21 @@ const App: React.FC = () => {
             }
         } catch (e: any) {
             console.error("Failed to update contacts via AI", e);
+            logAIDebugEvent({
+                id: crypto.randomUUID(),
+                toolName: 'ContactDetailsFinder',
+                timestamp: Date.now(),
+                prompt,
+                model: 'gemini-1.5-flash',
+                requestPayload: { prompt, responseMimeType: 'application/json' },
+                rawResponse: null,
+                cleanedText: '',
+                parsedJson: null,
+                missingFields: ['website', 'contactNumber', 'email', 'deputyHead', 'deputyHeadEmail'],
+                error: e?.message || 'Unknown error',
+                errorStack: e?.stack ?? null,
+                location: 'App.tsx:585'
+            });
             alert("AI Error: " + (e?.message || 'Could not fetch contact details.'));
             updateBackgroundTask(taskId, 'error', 'AI failed to find contact details.');
         }
@@ -1917,6 +1971,8 @@ const App: React.FC = () => {
                     onClose={() => setIsDebugOpen(false)}
                     debugData={aiDebug}
                 />
+
+                {import.meta.env.DEV && <AIDebugPanel />}
 
                 <BackgroundSyncStatus tasks={backgroundTasks} onDismiss={(id) => setBackgroundTasks(prev => prev.filter(t => t.id !== id))} />
                 <JobAlertNotification notifications={jobAlertNotifications} onDismiss={(id) => setJobAlertNotifications(prev => prev.filter(n => n.excelRowIndex !== id))} />
