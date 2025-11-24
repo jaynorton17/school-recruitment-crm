@@ -1,0 +1,55 @@
+steps:
+  # Step 1: Install dependencies
+  - name: "node:18"
+    entrypoint: npm
+    args: ["ci"]
+
+  # Step 2: Build Vite project
+  - name: "node:18"
+    entrypoint: npm
+    args: ["run", "build"]
+
+  # Step 3: Build production container using Dockerfile
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "$_IMAGE",
+        "."
+      ]
+
+  # Step 4: Push container image to Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "$_IMAGE"
+      ]
+
+  # Step 5: Deploy new container to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      [
+        "run",
+        "deploy",
+        "school-recruitment-crm",
+        "--image",
+        "$_IMAGE",
+        "--region",
+        "us-west1",
+        "--platform",
+        "managed",
+        "--allow-unauthenticated"
+      ]
+
+images:
+  - "$_IMAGE"
+
+substitutions:
+  _IMAGE: "us-west1-docker.pkg.dev/$PROJECT_ID/school-recruitment-crm/school-recruitment-crm:latest"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
