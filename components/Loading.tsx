@@ -44,11 +44,7 @@ const Loading: React.FC = () => {
 
     return (
         <div className={styles.container}>
-            <div className={styles.lights}>
-                {['red', 'green', 'blue', 'yellow', 'red', 'green', 'blue', 'yellow'].map((color, idx) => (
-                    <div key={idx} className={`${styles.bulb} ${styles[color as keyof typeof styles]}`} />
-                ))}
-            </div>
+            {/* Lights removed for testing */}
 
             <div className={styles.snowLayer}>{snowflakes}</div>
 
